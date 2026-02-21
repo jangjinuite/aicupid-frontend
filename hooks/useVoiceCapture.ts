@@ -33,6 +33,8 @@ export interface UseVoiceCaptureReturn {
   unregisterSpeechHandler: () => void;
   triggerPsychTest: () => Promise<void>;
   submitPsychTestResult: (blob1: Blob, blob2: Blob) => Promise<any>;
+  triggerQuiz: () => Promise<void>;
+  submitQuizResult: (blob: Blob, questionId: string) => Promise<any>;
 }
 
 // ── 유틸 ─────────────────────────────────────────────────────
@@ -313,6 +315,108 @@ export function useVoiceCapture(): UseVoiceCaptureReturn {
     }
   }, [playResponse, pushLog]);
 
+  // ── 퀴즈 API ──────────────────────────────────────────────────
+  const triggerQuiz = useCallback(async () => {
+    if (isFetchingRef.current) return;
+    if (!activeSessionIdRef.current) {
+      pushLog("✗ 진행 중인 세션이 없어 퀴즈를 시작할 수 없어요", "red");
+      return;
+    }
+
+    isFetchingRef.current = true;
+    setStatus("waiting");
+    pushLog("▶ 퀴즈 문제 요청 중...", "blue");
+
+    try {
+      const body = new URLSearchParams();
+      body.append("session_id", activeSessionIdRef.current);
+
+      const res = await fetch(`${BACKEND_URL}/api/four-choice-quiz`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded",
+        },
+        body: body.toString(),
+      });
+
+      if (!res.ok) throw new Error(`서버 에러 (${res.status})`);
+      const data = await res.json();
+
+      // data = { question_id, text, options(array), audio, mime_type }
+      setGameEvent({
+        type: "quiz",
+        questionId: data.question_id,
+        question: data.text,
+        choices: data.options || ["A", "B", "C", "D"]
+      });
+
+      if (data.audio) {
+        pushLog(`◀ 퀴즈 문제 오디오 수신`, "blue");
+        setStatus("ai_speaking");
+
+        if (vadRef.current) void vadRef.current.pause();
+
+        await playResponse(data.audio, data.mime_type || "audio/wav", () => {
+          isFetchingRef.current = false;
+          setStatus((prev) => (prev === "ai_speaking" || prev === "waiting") ? "listening" : prev);
+          if (vadRef.current && !destroyedRef.current) void vadRef.current.start();
+        });
+      } else {
+        isFetchingRef.current = false;
+        setStatus((prev) => (prev === "ai_speaking" || prev === "waiting") ? "listening" : prev);
+      }
+
+    } catch (err) {
+      pushLog(`✗ 퀴즈 호출 오류: ${err}`, "red");
+      isFetchingRef.current = false;
+      setStatus((prev) => (prev === "ai_speaking" || prev === "waiting") ? "listening" : prev);
+    }
+  }, [playResponse, pushLog]);
+
+  const submitQuizResult = useCallback(async (blob: Blob, questionId: string) => {
+    if (!activeSessionIdRef.current) throw new Error("No active session");
+
+    isFetchingRef.current = true;
+    setStatus("waiting");
+    pushLog(`▶ 퀴즈 정답 확인 중...`, "blue");
+
+    try {
+      const formData = new FormData();
+      const ext = blob.type.includes("webm") ? "webm" : "wav";
+      formData.append("file", blob, `answer.${ext}`);
+      formData.append("question_id", questionId);
+      formData.append("session_id", activeSessionIdRef.current);
+
+      const res = await fetch(`${BACKEND_URL}/api/quiz-result`, {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!res.ok) throw new Error(`서버 에러 (${res.status})`);
+      const data = await res.json();
+
+      if (data.audio) {
+        setStatus("ai_speaking");
+        if (vadRef.current) void vadRef.current.pause();
+        await playResponse(data.audio, data.mime_type || "audio/wav", () => {
+          isFetchingRef.current = false;
+          setStatus((prev) => (prev === "ai_speaking" || prev === "waiting") ? "listening" : prev);
+          if (vadRef.current && !destroyedRef.current) void vadRef.current.start();
+        });
+      } else {
+        isFetchingRef.current = false;
+        setStatus((prev) => (prev === "ai_speaking" || prev === "waiting") ? "listening" : prev);
+      }
+
+      return data;
+    } catch (err) {
+      pushLog(`✗ 퀴즈 결과 분석 오류: ${err}`, "red");
+      isFetchingRef.current = false;
+      setStatus((prev) => (prev === "ai_speaking" || prev === "waiting") ? "listening" : prev);
+      throw err;
+    }
+  }, [playResponse, pushLog]);
+
   // ── MediaRecorder 제어 로직 ──────────────────────────────────────
   const startMediaRecorder = async () => {
     try {
@@ -506,6 +610,7 @@ export function useVoiceCapture(): UseVoiceCaptureReturn {
     loading, error, gameEvent, debugLog,
     start, stop, forceCommit, dismissEvent,
     registerSpeechHandler, unregisterSpeechHandler,
-    triggerPsychTest, submitPsychTestResult
+    triggerPsychTest, submitPsychTestResult,
+    triggerQuiz, submitQuizResult
   };
 }

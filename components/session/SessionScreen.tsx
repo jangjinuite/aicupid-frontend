@@ -51,7 +51,8 @@ export function SessionScreen() {
         loading, error, gameEvent,
         start, stop, forceCommit, dismissEvent,
         registerSpeechHandler, unregisterSpeechHandler,
-        triggerPsychTest, submitPsychTestResult
+        triggerPsychTest, submitPsychTestResult,
+        triggerQuiz, submitQuizResult
     } = useVoiceCapture();
 
     const [devEvent, setDevEvent] = useState<GameEvent | null>(null);
@@ -69,6 +70,8 @@ export function SessionScreen() {
         const handler = (e: KeyboardEvent) => {
             if (e.key === "1") {
                 if (status !== "idle" && status !== "waiting") void triggerPsychTest();
+            } else if (e.key === "3") {
+                if (status !== "idle" && status !== "waiting") void triggerQuiz();
             } else {
                 const ev = DEV_EVENTS[e.key];
                 if (ev) setDevEvent(ev);
@@ -76,7 +79,7 @@ export function SessionScreen() {
         };
         window.addEventListener("keydown", handler);
         return () => window.removeEventListener("keydown", handler);
-    }, [triggerPsychTest, status]);
+    }, [triggerPsychTest, triggerQuiz, status]);
 
     const activeEvent = gameEvent ?? devEvent;
     const dismissActive = gameEvent ? dismissEvent : () => setDevEvent(null);
@@ -245,10 +248,14 @@ export function SessionScreen() {
 
                         {activeEvent.type === "quiz" && (
                             <QuizPopup
+                                questionId={activeEvent.questionId}
                                 question={activeEvent.question}
                                 choices={activeEvent.choices}
                                 voiceStatus={status}
                                 onClose={dismissActive}
+                                registerSpeechHandler={registerSpeechHandler}
+                                unregisterSpeechHandler={unregisterSpeechHandler}
+                                submitQuizResult={submitQuizResult}
                                 persona={persona}
                                 avatarState={avatarState}
                                 forceCommit={forceCommit}

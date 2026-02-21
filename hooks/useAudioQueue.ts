@@ -95,6 +95,10 @@ export function useAudioQueue() {
                 nextStartTimeRef.current = 0;
             }
             const ctx = audioCtxRef.current;
+            if (ctx.state === "suspended") {
+                await ctx.resume();
+            }
+
             try {
                 const decoded = await ctx.decodeAudioData(bytes.buffer.slice(0));
                 const source = ctx.createBufferSource();
@@ -108,12 +112,15 @@ export function useAudioQueue() {
                 const startAt = Math.max(ctx.currentTime, nextStartTimeRef.current);
                 source.start(startAt);
                 nextStartTimeRef.current = startAt + decoded.duration;
-            } catch {
+            } catch (err) {
+                console.warn("[AudioQueue] decodeAudioData failed, falling back to raw PCM", err);
                 // WAV 헤더 없이 raw PCM으로 폴백
                 enqueueRaw(base64, mimeType);
                 if (onPlayEnded) {
-                    // Raw enqueue is immediate/fire-and-forget roughly estimating duration
-                    setTimeout(onPlayEnded, 3000);
+                    // Approximate duration based on base64 length (pcm 16 bit 24000hz)
+                    // base64 length * 0.75 = bytes. bytes / 2 = samples. samples / 24000 = seconds
+                    const approxSeconds = (base64.length * 0.75) / 2 / 24000;
+                    setTimeout(onPlayEnded, Math.max(approxSeconds * 1000, 500));
                 }
             }
         },
