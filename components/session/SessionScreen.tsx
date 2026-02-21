@@ -67,6 +67,7 @@ export function SessionScreen() {
         triggerPsychTest, submitPsychTestResult,
         triggerQuiz, submitQuizResult,
         triggerBalanceGame, submitBalanceGameResult,
+        pauseVAD, resumeVAD, getSessionId
     } = useVoiceCapture();
 
     const [showStopModal, setShowStopModal] = useState(false);
@@ -107,6 +108,10 @@ export function SessionScreen() {
     };
 
     const confirmStop = () => {
+        const sessionId = getSessionId();
+        if (sessionId) {
+            dispatch({ type: "SET_LAST_SESSION_ID", payload: sessionId });
+        }
         setShowStopModal(false);
         stop();
         dispatch({ type: "SET_SESSION_SUMMARY", payload: "" });
@@ -284,6 +289,8 @@ export function SessionScreen() {
                                 registerSpeechHandler={registerSpeechHandler}
                                 unregisterSpeechHandler={unregisterSpeechHandler}
                                 submitBalanceGameResult={submitBalanceGameResult}
+                                pauseVAD={pauseVAD}
+                                resumeVAD={resumeVAD}
                             />
                         )}
 

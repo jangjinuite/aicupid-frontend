@@ -26,6 +26,8 @@ interface BalanceGamePopupProps {
     registerSpeechHandler: (handler: (blob: Blob) => void) => void;
     unregisterSpeechHandler: () => void;
     submitBalanceGameResult: (blobs: [Blob, Blob, Blob], texts: [string, string, string]) => Promise<any>;
+    pauseVAD: () => void;
+    resumeVAD: () => void;
 }
 
 // 0–2: recording each question, 3: loading, 4: result
@@ -42,6 +44,8 @@ export function BalanceGamePopup({
     registerSpeechHandler,
     unregisterSpeechHandler,
     submitBalanceGameResult,
+    pauseVAD,
+    resumeVAD,
 }: BalanceGamePopupProps) {
     const [phase, setPhase] = useState<Phase>(0);
     const [finalResult, setFinalResult] = useState<string | null>(null);
@@ -50,11 +54,14 @@ export function BalanceGamePopup({
 
     const currentQ = questions[phase < 3 ? phase : 0];
 
-    // Q1 오디오 자동 재생 (팝업 마운트 시)
+    // Q1 오디오 자동 재생 — 재생 중 VAD 중지, 끝나면 재개
     useEffect(() => {
         const q1 = questions[0];
         if (q1?.audio) {
-            void playResponse(q1.audio, q1.mime_type || "audio/wav", () => {});
+            pauseVAD();
+            void playResponse(q1.audio, q1.mime_type || "audio/wav", () => {
+                resumeVAD();
+            });
         }
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
@@ -72,14 +79,20 @@ export function BalanceGamePopup({
                 setPhase(1);
                 const q2 = questions[1];
                 if (q2?.audio) {
-                    await playResponse(q2.audio, q2.mime_type || "audio/wav", () => {});
+                    pauseVAD();
+                    await playResponse(q2.audio, q2.mime_type || "audio/wav", () => {
+                        resumeVAD();
+                    });
                 }
             } else if (newCount === 2) {
                 // advance to Q3, play its audio
                 setPhase(2);
                 const q3 = questions[2];
                 if (q3?.audio) {
-                    await playResponse(q3.audio, q3.mime_type || "audio/wav", () => {});
+                    pauseVAD();
+                    await playResponse(q3.audio, q3.mime_type || "audio/wav", () => {
+                        resumeVAD();
+                    });
                 }
             } else if (newCount === 3) {
                 // all answers collected — submit

@@ -16,6 +16,7 @@ interface AppState {
     userProfile: UserProfile | null;
     matchedUser: MatchedUser | null;
     sessionSummary: string;
+    lastSessionId: string | null;
 }
 
 type AppAction =
@@ -27,6 +28,7 @@ type AppAction =
     | { type: "SET_USER_PROFILE"; payload: UserProfile }
     | { type: "SET_MATCHED_USER"; payload: MatchedUser }
     | { type: "SET_SESSION_SUMMARY"; payload: string }
+    | { type: "SET_LAST_SESSION_ID"; payload: string }
     | { type: "LOGOUT" };
 
 const initialState: AppState = {
@@ -38,6 +40,7 @@ const initialState: AppState = {
     userProfile: null,
     matchedUser: null,
     sessionSummary: "",
+    lastSessionId: null,
 };
 
 function appReducer(state: AppState, action: AppAction): AppState {
@@ -74,6 +77,8 @@ function appReducer(state: AppState, action: AppAction): AppState {
             return { ...state, matchedUser: action.payload };
         case "SET_SESSION_SUMMARY":
             return { ...state, sessionSummary: action.payload };
+        case "SET_LAST_SESSION_ID":
+            return { ...state, lastSessionId: action.payload };
         case "LOGOUT":
             return { ...initialState };
         default:

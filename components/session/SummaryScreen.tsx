@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 import { useAppContext } from "@/context/AppContext";
 import { ActionModal } from "@/components/shared/ActionModal";
 import type { MatchedUser, UserProfile } from "@/types";
+import { useAudioQueue } from "@/hooks/useAudioQueue";
 
 // ── Mini profile card ─────────────────────────────────────────────
 function MiniProfile({ user, label }: { user: UserProfile | MatchedUser; label: string }) {
@@ -44,9 +45,50 @@ function MiniProfile({ user, label }: { user: UserProfile | MatchedUser; label: 
 export function SummaryScreen() {
     const router = useRouter();
     const { state, dispatch } = useAppContext();
-    const { userProfile, matchedUser, sessionSummary } = state;
+    const { userProfile, matchedUser, sessionSummary, lastSessionId } = state;
 
+    const { playResponse, close: closeAudio } = useAudioQueue();
     const [actionMessage, setActionMessage] = useState<string | null>(null);
+    const [isLoading, setIsLoading] = useState<boolean>(true);
+    const [chemistryIndex, setChemistryIndex] = useState<number>(75);
+
+    useEffect(() => {
+        if (!lastSessionId) {
+            setIsLoading(false);
+            return;
+        }
+
+        const fetchSummary = async () => {
+            try {
+                const res = await fetch("https://aicupid-backend-production.up.railway.app/api/chemistry-result", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ session_id: lastSessionId }),
+                });
+                if (!res.ok) throw new Error("API call failed");
+                const data = await res.json();
+
+                if (data.summary) {
+                    dispatch({ type: "SET_SESSION_SUMMARY", payload: data.summary });
+                }
+                setChemistryIndex(data.chemistry_index ?? 75);
+
+                if (data.audio) {
+                    playResponse(data.audio, data.mime_type || "audio/wav");
+                }
+            } catch (e) {
+                console.error(e);
+            } finally {
+                setIsLoading(false);
+            }
+        };
+
+        fetchSummary();
+
+        return () => {
+            closeAudio();
+        };
+    }, [lastSessionId, dispatch, playResponse, closeAudio]);
 
     const handleFriendOnly = () => {
         setActionMessage("친구 제안을 보냈습니다!");
@@ -120,16 +162,27 @@ export function SummaryScreen() {
                     initial={{ opacity: 0, y: 12 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: 0.15 }}
-                    className="w-full rounded-3xl p-5 overflow-hidden"
+                    className="w-full rounded-3xl p-5 overflow-hidden flex flex-col items-center justify-center"
                     style={{
                         backgroundColor: "#F6FAFA",
                         border: "1.5px solid #B8F0F0",
                         minHeight: 200,
                     }}
                 >
-                    <p className="text-sm font-medium text-[#1A1A1A] dark:text-[#F0F0F0] leading-relaxed whitespace-pre-line break-words">
-                        {summaryText}
-                    </p>
+                    {isLoading ? (
+                        <div className="flex flex-col items-center gap-2 text-[#1A1A1A]/40 dark:text-white/30">
+                            <motion.div
+                                animate={{ rotate: 360 }}
+                                transition={{ repeat: Infinity, duration: 1, ease: "linear" }}
+                                className="w-8 h-8 rounded-full border-4 border-t-transparent border-[#86E3E3]"
+                            />
+                            <span className="text-sm font-bold">결과 분석 중...</span>
+                        </div>
+                    ) : (
+                        <p className="text-sm font-medium text-[#1A1A1A] dark:text-[#F0F0F0] leading-relaxed whitespace-pre-line break-words w-full text-left">
+                            {summaryText}
+                        </p>
+                    )}
                 </motion.div>
 
                 {/* Compatibility badge */}
@@ -144,7 +197,7 @@ export function SummaryScreen() {
                     <div className="text-center">
                         <p className="font-black text-base text-[#4A0A40]">큐피드 케미 지수</p>
                         <p className="font-black text-3xl text-[#FAA2EE]">
-                            {mockCompatibility(userProfile, matchedUser)}%
+                            {isLoading ? "..." : chemistryIndex}%
                         </p>
                     </div>
                     <span className="text-2xl">💘</span>

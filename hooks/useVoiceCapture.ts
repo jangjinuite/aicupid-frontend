@@ -38,6 +38,9 @@ export interface UseVoiceCaptureReturn {
   submitQuizResult: (blob: Blob, questionId: string) => Promise<any>;
   triggerBalanceGame: () => Promise<void>;
   submitBalanceGameResult: (blobs: [Blob, Blob, Blob], questionTexts: [string, string, string]) => Promise<any>;
+  pauseVAD: () => void;
+  resumeVAD: () => void;
+  getSessionId: () => string | null;
 }
 
 // ── 유틸 ─────────────────────────────────────────────────────
@@ -154,7 +157,7 @@ export function useVoiceCapture(): UseVoiceCaptureReturn {
   const audioChunksRef = useRef<Blob[]>([]);
   const audioStreamRef = useRef<MediaStream | null>(null);
 
-  const { playResponse, close: closeAudio } = useAudioQueue();
+  const { playResponse, close: closeAudio, resetClosed } = useAudioQueue();
 
   const isWaiting = status === "waiting" || isFetchingRef.current;
 
@@ -738,13 +741,14 @@ export function useVoiceCapture(): UseVoiceCaptureReturn {
 
   // ── 세션 시작 / 중지 ─────────────────────────────────────────
   const start = useCallback(() => {
+    resetClosed();
     const vad = vadRef.current;
     if (!vad) return;
     void vad.start();
     void startMediaRecorder();
     setStatus("listening");
     pushLog("▶ 세션 시작", "green");
-  }, [pushLog]);
+  }, [pushLog, resetClosed]);
 
   const stop = useCallback(() => {
     const vad = vadRef.current;
@@ -762,6 +766,19 @@ export function useVoiceCapture(): UseVoiceCaptureReturn {
 
   const dismissEvent = useCallback(() => setGameEvent(null), []);
 
+  const pauseVAD = useCallback(() => {
+    if (vadRef.current) void vadRef.current.pause();
+  }, []);
+
+  const resumeVAD = useCallback(() => {
+    if (vadRef.current && !destroyedRef.current) {
+      void vadRef.current.start();
+      void startMediaRecorder();
+    }
+  }, []);
+
+  const getSessionId = useCallback(() => activeSessionIdRef.current, []);
+
   return {
     status, isWaiting, avatarState,
     loading, error, gameEvent, lastReply, debugLog,
@@ -770,5 +787,6 @@ export function useVoiceCapture(): UseVoiceCaptureReturn {
     triggerPsychTest, submitPsychTestResult,
     triggerQuiz, submitQuizResult,
     triggerBalanceGame, submitBalanceGameResult,
+    pauseVAD, resumeVAD, getSessionId,
   };
 }

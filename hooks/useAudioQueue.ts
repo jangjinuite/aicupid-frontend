@@ -12,10 +12,11 @@ export function useAudioQueue() {
     const audioCtxRef = useRef<AudioContext | null>(null);
     const nextStartTimeRef = useRef<number>(0);
     const audioElemRef = useRef<HTMLAudioElement | null>(null);
+    const isClosedRef = useRef<boolean>(false);
 
     /** base64 WAV/PCM 청크를 AudioContext 큐에 추가 */
     const enqueueRaw = useCallback((base64: string, mimeType: string) => {
-        if (!base64) return;
+        if (!base64 || isClosedRef.current) return;
 
         // mimeType에서 샘플레이트 파싱 (예: "audio/pcm;rate=24000")
         const rateMatch = mimeType.match(/rate=(\d+)/);
@@ -59,7 +60,7 @@ export function useAudioQueue() {
      */
     const playResponse = useCallback(
         async (base64: string, mimeType: string, onPlayEnded?: () => void) => {
-            if (!base64) {
+            if (!base64 || isClosedRef.current) {
                 if (onPlayEnded) onPlayEnded();
                 return;
             }
@@ -132,8 +133,13 @@ export function useAudioQueue() {
         nextStartTimeRef.current = 0;
     }, []);
 
+    const resetClosed = useCallback(() => {
+        isClosedRef.current = false;
+    }, []);
+
     /** 세션 종료 시 AudioContext 닫기 */
     const close = useCallback(() => {
+        isClosedRef.current = true;
         audioCtxRef.current?.close();
         audioCtxRef.current = null;
         nextStartTimeRef.current = 0;
@@ -143,5 +149,5 @@ export function useAudioQueue() {
         }
     }, []);
 
-    return { playResponse, enqueueRaw, flush, close };
+    return { playResponse, enqueueRaw, flush, close, resetClosed };
 }
