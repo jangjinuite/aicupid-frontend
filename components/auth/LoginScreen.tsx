@@ -19,10 +19,13 @@ export function LoginScreen() {
 
         try {
             const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL ?? "http://localhost:8000";
-            const response = await fetch(`${BACKEND_URL}/api/auth/login`, {
+            const formData = new URLSearchParams();
+            formData.append("username", userId.trim());
+            formData.append("password", password);
+            const response = await fetch(`${BACKEND_URL}/api/auth/token`, {
                 method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ userId: userId.trim(), password }),
+                headers: { "Content-Type": "application/x-www-form-urlencoded" },
+                body: formData.toString(),
             });
 
             if (!response.ok) {
