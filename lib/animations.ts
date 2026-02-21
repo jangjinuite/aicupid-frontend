@@ -1,72 +1,71 @@
 import type { Variants } from "framer-motion";
 
-// Landing → Session transition
-export const logoVariants: Variants = {
-    center: {
-        scale: 1,
-        opacity: 1,
-        y: 0,
-        transition: { duration: 0.8, ease: [0.22, 1, 0.36, 1] },
-    },
-    shrinkOut: {
-        scale: 0.1,
-        opacity: 0,
-        y: -80,
-        transition: { duration: 0.6, ease: [0.55, 0, 1, 0.45] },
-    },
-};
-
-export const micButtonVariants: Variants = {
-    visible: {
-        opacity: 1,
-        y: 0,
-        transition: { delay: 0.5, duration: 0.5, ease: "easeOut" },
-    },
-    hidden: {
-        opacity: 0,
-        y: 40,
-        transition: { duration: 0.3 },
-    },
-};
-
 // Avatar entrance
 export const avatarVariants: Variants = {
-    hidden: { scale: 0.5, opacity: 0, y: 80 },
+    hidden: { scale: 0.85, opacity: 0, y: 30 },
     visible: {
         scale: 1,
         opacity: 1,
         y: 0,
-        transition: { type: "spring", stiffness: 180, damping: 22, delay: 0.15 },
+        transition: { type: "spring", stiffness: 200, damping: 24, delay: 0.1 },
     },
-    exit: { scale: 0.5, opacity: 0, y: -80 },
+    exit: { scale: 0.85, opacity: 0, y: -30 },
 };
 
-// Pulsing ring for different avatar states
+// Avatar ring pulse per state
 export const speakingRingVariants: Variants = {
-    idle: { scale: 1, opacity: 0.2 },
+    idle: { scale: 1, opacity: 0 },
     speaking: {
-        scale: [1, 1.18, 1],
-        opacity: [0.5, 0.9, 0.5],
-        transition: { duration: 1.2, repeat: Infinity, ease: "easeInOut" },
-    },
-    listening: {
-        scale: [1, 1.08, 1],
-        opacity: [0.2, 0.6, 0.2],
+        scale: [1, 1.12, 1],
+        opacity: [0.6, 1, 0.6],
         transition: { duration: 0.9, repeat: Infinity, ease: "easeInOut" },
     },
+    listening: {
+        scale: [1, 1.06, 1],
+        opacity: [0.3, 0.7, 0.3],
+        transition: { duration: 1.1, repeat: Infinity, ease: "easeInOut" },
+    },
     thinking: {
-        scale: [1, 1.05, 1.1, 1.05, 1],
-        opacity: [0.3, 0.5, 0.3, 0.5, 0.3],
-        transition: { duration: 2, repeat: Infinity, ease: "easeInOut" },
+        scale: [1, 1.04, 1.08, 1.04, 1],
+        opacity: [0.2, 0.4, 0.2, 0.4, 0.2],
+        transition: { duration: 2.2, repeat: Infinity, ease: "easeInOut" },
     },
 };
 
-// Session panel entrance
-export const sessionPanelVariants: Variants = {
-    hidden: { opacity: 0, y: 20 },
-    visible: (i: number) => ({
+// Backdrop fade (wrapper around modals)
+export const popupVariants: Variants = {
+    hidden: { opacity: 0 },
+    visible: { opacity: 1, transition: { duration: 0.18 } },
+    exit: { opacity: 0, transition: { duration: 0.14 } },
+};
+
+// Center modal card scale-in
+export const modalCardVariants: Variants = {
+    hidden: { scale: 0.88, opacity: 0, y: 12 },
+    visible: {
+        scale: 1,
         opacity: 1,
         y: 0,
-        transition: { delay: 0.4 + i * 0.1, duration: 0.5, ease: "easeOut" },
-    }),
+        transition: { type: "spring", stiffness: 340, damping: 28 },
+    },
+    exit: {
+        scale: 0.88,
+        opacity: 0,
+        y: 12,
+        transition: { duration: 0.14, ease: "easeIn" },
+    },
+};
+
+// Persona card slide
+export const slideVariants: Variants = {
+    enter: (dir: number) => ({ x: dir > 0 ? 60 : -60, opacity: 0 }),
+    center: { x: 0, opacity: 1 },
+    exit: (dir: number) => ({ x: dir > 0 ? -60 : 60, opacity: 0 }),
+};
+
+// Screen fade
+export const fadeVariants: Variants = {
+    hidden: { opacity: 0 },
+    visible: { opacity: 1, transition: { duration: 0.25 } },
+    exit: { opacity: 0, transition: { duration: 0.2 } },
 };

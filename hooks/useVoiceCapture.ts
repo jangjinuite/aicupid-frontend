@@ -33,6 +33,7 @@ export interface UseVoiceCaptureReturn {
   start: () => void;
   stop: () => void;
   forceCommit: () => void;
+  dismissEvent: () => void;
 }
 
 // ── 유틸 ─────────────────────────────────────────────────────
@@ -66,6 +67,7 @@ export function useVoiceCapture(): UseVoiceCaptureReturn {
   const [debugLog, setDebugLog] = useState<DebugEvent[]>([]);
 
   // refs — 클로저 갱신 없이 항상 최신값
+  const sessionIdRef = useRef<string>(crypto.randomUUID());
   const vadRef = useRef<MicVAD | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
   const audioCtxRef = useRef<AudioContext | null>(null);
@@ -103,7 +105,7 @@ export function useVoiceCapture(): UseVoiceCaptureReturn {
     setWsStatus("connecting");
     pushLog("WS 연결 시도...", "yellow");
 
-    const ws = new WebSocket(WS_URL);
+    const ws = new WebSocket(`${WS_URL}?session_id=${sessionIdRef.current}`);
     ws.binaryType = "arraybuffer";
     wsRef.current = ws;
 
@@ -291,9 +293,11 @@ export function useVoiceCapture(): UseVoiceCaptureReturn {
     pushLog("■ 세션 중지", "yellow");
   }, [stopStreaming, closeWS, closeAudio, pushLog]);
 
+  const dismissEvent = useCallback(() => setGameEvent(null), []);
+
   return {
     status, wsStatus, isWaiting, avatarState,
     loading, error, gameEvent, debugLog,
-    start, stop, forceCommit,
+    start, stop, forceCommit, dismissEvent,
   };
 }

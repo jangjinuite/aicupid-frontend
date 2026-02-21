@@ -8,9 +8,14 @@
   }
 
   body {
-    background-color: #080808;
-    color: rgba(255, 255, 255, 0.88);
+    background-color: #ffffff;
+    color: #1a1a1a;
     font-family: Inter, system-ui, sans-serif;
+  }
+
+  .dark body {
+    background-color: #1c1c1e;
+    color: #f0f0f0;
   }
 
   ::-webkit-scrollbar {
@@ -20,16 +25,27 @@
     background: transparent;
   }
   ::-webkit-scrollbar-thumb {
-    background: rgba(255, 255, 255, 0.12);
+    background: rgba(0, 0, 0, 0.12);
     border-radius: 2px;
+  }
+  .dark ::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.12);
   }
 }
 
 @layer components {
-  .glass-card {
-    @apply bg-white/5 backdrop-blur-md border border-white/10 rounded-2xl;
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6),
-      inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  .popup-sheet {
+    @apply bg-white/90 dark:bg-[#2C2C2E]/90 backdrop-blur-2xl;
+    border: 1px solid rgba(134, 227, 227, 0.2);
+    box-shadow: 0 8px 48px rgba(0, 0, 0, 0.14), 0 2px 8px rgba(0, 0, 0, 0.06);
+  }
+
+  .choice-card {
+    @apply rounded-2xl flex items-center justify-center font-bold text-lg transition-transform active:scale-95;
+  }
+
+  .status-pill {
+    @apply inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold;
   }
 }
 

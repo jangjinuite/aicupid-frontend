@@ -1,84 +1,91 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { avatarVariants, speakingRingVariants } from "@/lib/animations";
+import { speakingRingVariants } from "@/lib/animations";
+import { EQBars } from "./EQBars";
 import type { AvatarState, Persona } from "@/types";
+import type { VoiceStatus } from "@/hooks/useVoiceCapture";
 
 interface AvatarCoreProps {
     avatarState: AvatarState;
+    voiceStatus: VoiceStatus;
     persona: Persona;
-    layoutId?: string;
 }
 
-const STATE_LABELS: Record<AvatarState, string> = {
-    idle: "대기 중",
-    listening: "듣는 중...",
-    speaking: "말하는 중...",
-    thinking: "생각 중...",
+const RING_COLOR: Record<AvatarState, string> = {
+    idle: "rgba(134,227,227,0.15)",
+    listening: "rgba(134,227,227,0.5)",
+    speaking: "rgba(134,227,227,0.9)",
+    thinking: "rgba(230,208,142,0.6)",
 };
 
-const STATE_COLORS: Record<AvatarState, string> = {
-    idle: "rgba(255,255,255,0.10)",
-    listening: "rgba(255,255,255,0.55)",
-    speaking: "rgba(255,255,255,0.70)",
-    thinking: "rgba(255,255,255,0.35)",
-};
+// Avatar size: responsive via clamp (min 150px, scales with vw, max 210px)
+const AVATAR_SIZE = "clamp(150px, 46vw, 210px)";
 
-export function AvatarCore({ avatarState, persona, layoutId }: AvatarCoreProps) {
-    const stateColor = STATE_COLORS[avatarState];
-
+export function AvatarCore({ avatarState, voiceStatus, persona }: AvatarCoreProps) {
     return (
-        <motion.div
-            className="flex flex-col items-center gap-5"
-            variants={avatarVariants}
-            initial="hidden"
-            animate="visible"
-        >
-            <div className="relative flex items-center justify-center">
-                {/* Pulsing state ring */}
-                <motion.div
-                    className="absolute inset-0 rounded-full scale-[1.22]"
-                    style={{ border: `1.5px solid ${stateColor}`, opacity: 0.5 }}
-                    variants={speakingRingVariants}
-                    animate={avatarState}
-                />
+        <div className="flex flex-col items-center gap-4">
+            {/* EQ bars + avatar row */}
+            <div className="flex items-center gap-[clamp(0.5rem,2vw,1rem)]">
+                {/* Left EQ bars */}
+                <EQBars status={voiceStatus} side="left" count={7} />
 
-                {/* Rotating gradient border */}
-                <motion.div
-                    className="relative w-64 h-64"
-                    layoutId={layoutId}
-                    transition={{ type: "spring", stiffness: 300, damping: 30 }}
-                >
-                    <div
-                        className="absolute inset-0 rounded-full animate-spin-slow"
+                {/* Avatar circle */}
+                <div className="relative flex items-center justify-center">
+                    {/* Pulsing ring */}
+                    <motion.div
+                        className="absolute rounded-full"
                         style={{
-                            background:
-                                "conic-gradient(from 0deg, transparent 0%, rgba(255,255,255,0.08) 30%, rgba(255,255,255,0.35) 50%, rgba(255,255,255,0.08) 70%, transparent 100%)",
+                            inset: -10,
+                            border: `2.5px solid ${RING_COLOR[avatarState]}`,
                         }}
+                        variants={speakingRingVariants}
+                        animate={avatarState}
                     />
+
+                    {/* Avatar container — responsive size */}
                     <div
-                        className="absolute inset-[3px] rounded-full flex items-center justify-center"
-                        style={{ background: "#080808", border: "1px solid rgba(255,255,255,0.06)" }}
+                        style={{
+                            width: AVATAR_SIZE,
+                            height: AVATAR_SIZE,
+                            border: "3px solid #86E3E3",
+                            background: "#F0FAFA",
+                            borderRadius: "50%",
+                            overflow: "hidden",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            position: "relative",
+                        }}
                     >
-                        <span className="text-7xl select-none">{persona.emoji}</span>
+                        {/* Place /public/avatar.png to show the MC character */}
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                            src="/avatar.png"
+                            alt={persona.name}
+                            style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                            onError={(e) => {
+                                (e.target as HTMLImageElement).style.display = "none";
+                            }}
+                        />
+                        {/* Fallback emoji */}
+                        <span
+                            className="absolute select-none"
+                            style={{ fontSize: "clamp(3rem, 12vw, 4.5rem)" }}
+                        >
+                            {persona.emoji}
+                        </span>
                     </div>
-                </motion.div>
+                </div>
+
+                {/* Right EQ bars */}
+                <EQBars status={voiceStatus} side="right" count={7} />
             </div>
 
-            {/* Name + state */}
-            <div className="text-center">
-                <p className="text-base font-medium tracking-wide text-white/70">{persona.name}</p>
-                <motion.div
-                    className="flex items-center justify-center gap-1.5 mt-1"
-                    key={avatarState}
-                    initial={{ opacity: 0, y: 3 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.25 }}
-                >
-                    <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: stateColor }} />
-                    <span className="text-xs text-white/35">{STATE_LABELS[avatarState]}</span>
-                </motion.div>
-            </div>
-        </motion.div>
+            {/* Persona name */}
+            <p className="font-bold text-[clamp(1rem,4vw,1.25rem)] text-[#1A1A1A] dark:text-[#F0F0F0] tracking-tight">
+                {persona.name}
+            </p>
+        </div>
     );
 }
