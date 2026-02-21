@@ -58,8 +58,11 @@ export function useAudioQueue() {
      * WAV 헤더가 포함된 경우 decodeAudioData로 디코딩, 아닌 경우 raw PCM으로 처리.
      */
     const playResponse = useCallback(
-        async (base64: string, mimeType: string) => {
-            if (!base64) return;
+        async (base64: string, mimeType: string, onPlayEnded?: () => void) => {
+            if (!base64) {
+                if (onPlayEnded) onPlayEnded();
+                return;
+            }
 
             const binaryStr = atob(base64);
             const bytes = new Uint8Array(binaryStr.length);
@@ -73,10 +76,16 @@ export function useAudioQueue() {
                 const url = URL.createObjectURL(blob);
                 if (!audioElemRef.current) audioElemRef.current = new Audio();
                 audioElemRef.current.src = url;
-                audioElemRef.current.onended = () => URL.revokeObjectURL(url);
-                await audioElemRef.current.play().catch((e) =>
-                    console.error("[AudioQueue] mp3 play failed:", e)
-                );
+                audioElemRef.current.onended = () => {
+                    URL.revokeObjectURL(url);
+                    if (onPlayEnded) onPlayEnded();
+                };
+                try {
+                    await audioElemRef.current.play();
+                } catch (e) {
+                    console.error("[AudioQueue] mp3 play failed:", e);
+                    if (onPlayEnded) onPlayEnded();
+                }
                 return;
             }
 
@@ -91,12 +100,21 @@ export function useAudioQueue() {
                 const source = ctx.createBufferSource();
                 source.buffer = decoded;
                 source.connect(ctx.destination);
+
+                if (onPlayEnded) {
+                    source.onended = onPlayEnded;
+                }
+
                 const startAt = Math.max(ctx.currentTime, nextStartTimeRef.current);
                 source.start(startAt);
                 nextStartTimeRef.current = startAt + decoded.duration;
             } catch {
                 // WAV 헤더 없이 raw PCM으로 폴백
                 enqueueRaw(base64, mimeType);
+                if (onPlayEnded) {
+                    // Raw enqueue is immediate/fire-and-forget roughly estimating duration
+                    setTimeout(onPlayEnded, 3000);
+                }
             }
         },
         [enqueueRaw]

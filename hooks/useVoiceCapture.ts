@@ -173,15 +173,27 @@ export function useVoiceCapture(): UseVoiceCaptureReturn {
       if (audioB64) {
         pushLog(`◀ 오디오 수신 (${Math.round((audioB64.length * 3) / 4 / 1024)}KB)`, "blue");
         setStatus("ai_speaking");
-        await playResponse(audioB64, mimeType);
-        pushLog("✓ 재생 완료", "blue");
+
+        // AI 스피킹 중 VAD 음소거(에코 캔슬링 폴백)
+        if (vadRef.current) void vadRef.current.pause();
+
+        await playResponse(audioB64, mimeType, () => {
+          pushLog("✓ 오디오 재생 완료, VAD 재개", "green");
+          isFetchingRef.current = false;
+          setStatus((prev) => (prev === "ai_speaking" || prev === "waiting") ? "listening" : prev);
+          if (vadRef.current && !destroyedRef.current) {
+            void vadRef.current.start();
+          }
+        });
+      } else {
+        isFetchingRef.current = false;
+        setStatus((prev) => (prev === "ai_speaking" || prev === "waiting") ? "listening" : prev);
       }
 
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       pushLog(`✗ 통신 오류: ${msg}`, "red");
       setError(msg);
-    } finally {
       isFetchingRef.current = false;
       setStatus((prev) => (prev === "ai_speaking" || prev === "waiting") ? "listening" : prev);
     }
@@ -231,11 +243,22 @@ export function useVoiceCapture(): UseVoiceCaptureReturn {
       if (audioB64) {
         pushLog(`◀ 오디오 수신 (${Math.round((audioB64.length * 3) / 4 / 1024)}KB)`, "blue");
         setStatus("ai_speaking");
-        await playResponse(audioB64, mimeType);
+
+        if (vadRef.current) void vadRef.current.pause();
+
+        await playResponse(audioB64, mimeType, () => {
+          isFetchingRef.current = false;
+          setStatus((prev) => (prev === "ai_speaking" || prev === "waiting") ? "listening" : prev);
+          if (vadRef.current && !destroyedRef.current) {
+            void vadRef.current.start();
+          }
+        });
+      } else {
+        isFetchingRef.current = false;
+        setStatus((prev) => (prev === "ai_speaking" || prev === "waiting") ? "listening" : prev);
       }
     } catch (err) {
       pushLog(`✗ 심리테스트 호출 오류: ${err}`, "red");
-    } finally {
       isFetchingRef.current = false;
       setStatus((prev) => (prev === "ai_speaking" || prev === "waiting") ? "listening" : prev);
     }
@@ -266,16 +289,27 @@ export function useVoiceCapture(): UseVoiceCaptureReturn {
 
       if (data.audio) {
         setStatus("ai_speaking");
-        await playResponse(data.audio, data.mime_type || "audio/wav");
+
+        if (vadRef.current) void vadRef.current.pause();
+
+        await playResponse(data.audio, data.mime_type || "audio/wav", () => {
+          isFetchingRef.current = false;
+          setStatus((prev) => (prev === "ai_speaking" || prev === "waiting") ? "listening" : prev);
+          if (vadRef.current && !destroyedRef.current) {
+            void vadRef.current.start();
+          }
+        });
+      } else {
+        isFetchingRef.current = false;
+        setStatus((prev) => (prev === "ai_speaking" || prev === "waiting") ? "listening" : prev);
       }
 
       return data;
     } catch (err) {
       pushLog(`✗ 결과 분석 오류: ${err}`, "red");
-      throw err;
-    } finally {
       isFetchingRef.current = false;
       setStatus((prev) => (prev === "ai_speaking" || prev === "waiting") ? "listening" : prev);
+      throw err;
     }
   }, [playResponse, pushLog]);
 
@@ -283,7 +317,13 @@ export function useVoiceCapture(): UseVoiceCaptureReturn {
   const startMediaRecorder = async () => {
     try {
       if (!audioStreamRef.current) {
-        audioStreamRef.current = await navigator.mediaDevices.getUserMedia({ audio: true });
+        audioStreamRef.current = await navigator.mediaDevices.getUserMedia({
+          audio: {
+            echoCancellation: true,
+            noiseSuppression: true,
+            autoGainControl: true,
+          }
+        });
       }
       const stream = audioStreamRef.current;
       audioChunksRef.current = [];
@@ -331,6 +371,8 @@ export function useVoiceCapture(): UseVoiceCaptureReturn {
       startOnLoad: false,
       baseAssetPath: "/",
       onnxWASMBasePath: "/",
+      positiveSpeechThreshold: 0.90, // 좀 더 확실한 음성만 감지하도록 상향 (기본값보다 높음)
+      negativeSpeechThreshold: 0.75, // 빨리 끊기도록 하향 조정
 
       onSpeechStart() {
         if (isFetchingRef.current) return;
