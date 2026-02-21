@@ -50,6 +50,15 @@ export function BalanceGamePopup({
 
     const currentQ = questions[phase < 3 ? phase : 0];
 
+    // Q1 오디오 자동 재생 (팝업 마운트 시)
+    useEffect(() => {
+        const q1 = questions[0];
+        if (q1?.audio) {
+            void playResponse(q1.audio, q1.mime_type || "audio/wav", () => {});
+        }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+
     useEffect(() => {
         registerSpeechHandler(async (blob: Blob) => {
             const count = audioBlobsRef.current.length;

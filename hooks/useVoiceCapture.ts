@@ -84,6 +84,53 @@ function encodeWAV(samples: Float32Array, sampleRate: number = 16000): Blob {
 
 const MAX_LOG = 40;
 
+// ── triggered_game 응답 → GameEvent 변환 ─────────────────────
+function mapTriggeredGame(game: any): GameEvent | null {
+  if (!game?.type) return null;
+
+  if (game.type === "balance_game") {
+    const qs = game.questions as {
+      question_id?: string;
+      question_text: string;
+      option_a: string;
+      option_b: string;
+      audio?: string;
+      mime_type?: string;
+    }[];
+    if (!qs?.length) return null;
+    return {
+      type: "balance",
+      question: qs[0].question_text,
+      choices: [qs[0].option_a, qs[0].option_b],
+      questions: qs.map((q) => ({
+        text: q.question_text,
+        options: [q.option_a, q.option_b],
+        audio: q.audio,
+        mime_type: q.mime_type,
+      })),
+    };
+  }
+
+  if (game.type === "psych_test") {
+    return {
+      type: "psych",
+      question: game.question_text || game.text || "",
+      choices: [],
+    };
+  }
+
+  if (game.type === "four_choice_quiz" || game.type === "quiz") {
+    return {
+      type: "quiz",
+      questionId: game.question_id,
+      question: game.question_text || game.text || "",
+      choices: game.options || [],
+    };
+  }
+
+  return null;
+}
+
 // ── Hook ─────────────────────────────────────────────────────
 
 export function useVoiceCapture(): UseVoiceCaptureReturn {
@@ -171,10 +218,15 @@ export function useVoiceCapture(): UseVoiceCaptureReturn {
       const reply = data.reply;
       const audioB64 = data.audio;
       const mimeType = data.mime_type || "audio/wav";
+      const pendingGameEvent = mapTriggeredGame(data.triggered_game ?? null);
 
       if (reply) {
         pushLog(`◀ AI 답변: ${reply}`, "green");
         setLastReply(reply);
+      }
+
+      if (pendingGameEvent) {
+        pushLog(`◀ 게임 트리거됨: ${pendingGameEvent.type}`, "purple");
       }
 
       if (audioB64) {
@@ -183,10 +235,16 @@ export function useVoiceCapture(): UseVoiceCaptureReturn {
 
         await playResponse(audioB64, mimeType, () => {
           pushLog("✓ 오디오 재생 완료", "green");
+          if (pendingGameEvent) {
+            setGameEvent(pendingGameEvent);
+          }
           isFetchingRef.current = false;
           setStatus((prev) => (prev === "ai_speaking" || prev === "waiting") ? "listening" : prev);
         });
       } else {
+        if (pendingGameEvent) {
+          setGameEvent(pendingGameEvent);
+        }
         isFetchingRef.current = false;
         setStatus((prev) => (prev === "ai_speaking" || prev === "waiting") ? "listening" : prev);
       }
@@ -438,17 +496,9 @@ export function useVoiceCapture(): UseVoiceCaptureReturn {
         questions,
       });
 
-      if (questions[0].audio) {
-        pushLog(`◀ 밸런스 게임 첫 번째 문제 오디오 수신`, "blue");
-        setStatus("ai_speaking");
-        await playResponse(questions[0].audio, questions[0].mime_type || "audio/wav", () => {
-          isFetchingRef.current = false;
-          setStatus((prev) => (prev === "ai_speaking" || prev === "waiting") ? "listening" : prev);
-        });
-      } else {
-        isFetchingRef.current = false;
-        setStatus((prev) => (prev === "ai_speaking" || prev === "waiting") ? "listening" : prev);
-      }
+      // Q1 오디오는 BalanceGamePopup 마운트 시 자동 재생
+      isFetchingRef.current = false;
+      setStatus("listening");
     } catch (err) {
       pushLog(`✗ 밸런스 게임 호출 오류: ${err}`, "red");
       isFetchingRef.current = false;

@@ -14,7 +14,6 @@ import { QuizPopup } from "./popups/QuizPopup";
 import { ActionModal } from "@/components/shared/ActionModal";
 import { PERSONAS } from "@/lib/mockData";
 import { popupVariants, modalCardVariants } from "@/lib/animations";
-import type { GameEvent } from "@/types";
 
 const STATUS_PILL: Record<string, { label: string; bg: string; text: string }> = {
     idle: { label: "● 대기", bg: "#F0F0F0", text: "#9CA3AF" },
@@ -30,51 +29,29 @@ const GAME_LABELS: Record<string, string> = {
     quiz: "퀴즈",
 };
 
-// ── Dev test fixtures (keyboard 1/2/3) ───────────────────────
-const DEV_EVENTS: Record<string, GameEvent> = {
-    "1": {
-        type: "psych",
-        question: "당신은 지금 깊은 숲속을 걷고 있습니다. 곁에는 원숭이, 사자, 말, 소, 양 이렇게 다섯 마리의 동물이 함께 있어요. 길을 가다 보니 너무 힘들어서 한 마리씩 버리고 가야 합니다. 어떤 순서로 버리시겠어요?",
-        choices: [],
-    },
-    "2": {
-        type: "balance",
-        question: "평생 한 종류의 음식만 먹어야 한다면? 단짠 vs 매콤",
-        choices: ["단짠", "매콤"],
-        questions: [
-            { text: "평생 한 종류의 음식만 먹어야 한다면? 단짠(달고 짠 음식) vs 매콤(매운 음식)", options: ["단짠", "매콤"] },
-            { text: "여행 스타일은? 혼자 여행 vs 함께 여행", options: ["혼자 여행", "함께 여행"] },
-            { text: "주말 저녁은? 영화관 데이트 vs 넷플릭스 집콕", options: ["영화관", "넷플릭스"] },
-        ],
-    },
-    "3": {
-        type: "quiz",
-        question: "다음 중 사랑의 신 큐피드의 무기는 무엇일까요?",
-        choices: ["활과 화살", "마법 지팡이", "황금 방패", "수정 구슬"],
-    },
-};
-
 // ── Loading card shown while API is pending ───────────────────
 function GameLoadingCard({ type }: { type: "quiz" | "psych" | "balance" }) {
     return (
         <motion.div
-            className="relative w-full popup-sheet rounded-[2rem] z-30 px-6 py-10 flex flex-col items-center gap-5"
-            variants={modalCardVariants}
-            initial="hidden"
-            animate="visible"
-            exit="exit"
+            className="relative z-30 flex flex-col items-center gap-6"
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.9 }}
+            transition={{ duration: 0.2 }}
         >
-            <span className="text-xs font-bold tracking-widest uppercase text-gold">
-                {GAME_LABELS[type]}
-            </span>
             <motion.div
                 animate={{ rotate: 360 }}
-                transition={{ repeat: Infinity, duration: 1, ease: "linear" }}
-                className="w-9 h-9 border-4 border-[#1A1A1A]/10 border-t-[#86E3E3] rounded-full"
+                transition={{ repeat: Infinity, duration: 0.9, ease: "linear" }}
+                className="w-14 h-14 border-4 border-white/20 border-t-white rounded-full"
             />
-            <p className="text-sm font-bold text-[#1A1A1A]/50 dark:text-white/40 animate-pulse">
-                로딩 중...
-            </p>
+            <div className="flex flex-col items-center gap-2">
+                <span className="text-xs font-bold tracking-widest uppercase text-white/60">
+                    {GAME_LABELS[type]}
+                </span>
+                <p className="text-lg font-black text-white">
+                    로딩 중...
+                </p>
+            </div>
         </motion.div>
     );
 }
@@ -92,7 +69,6 @@ export function SessionScreen() {
         triggerBalanceGame, submitBalanceGameResult,
     } = useVoiceCapture();
 
-    const [devEvent, setDevEvent] = useState<GameEvent | null>(null);
     const [showStopModal, setShowStopModal] = useState(false);
 
     useEffect(() => {
@@ -104,25 +80,18 @@ export function SessionScreen() {
     useEffect(() => {
         const handler = (e: KeyboardEvent) => {
             // 팝업이 떠 있으면 다른 키 입력 무시
-            if (gameEvent || devEvent) return;
+            if (gameEvent) return;
 
-            if (e.key === "1") {
-                if (status !== "idle" && status !== "waiting") void triggerPsychTest();
-                else setDevEvent(DEV_EVENTS["1"]);
-            } else if (e.key === "2") {
-                if (status !== "idle" && status !== "waiting") void triggerBalanceGame();
-                else setDevEvent(DEV_EVENTS["2"]);
-            } else if (e.key === "3") {
-                if (status !== "idle" && status !== "waiting") void triggerQuiz();
-                else setDevEvent(DEV_EVENTS["3"]);
-            }
+            if (e.key === "1") void triggerPsychTest();
+            else if (e.key === "2") void triggerBalanceGame();
+            else if (e.key === "3") void triggerQuiz();
         };
         window.addEventListener("keydown", handler);
         return () => window.removeEventListener("keydown", handler);
-    }, [triggerPsychTest, triggerBalanceGame, triggerQuiz, status, gameEvent, devEvent]);
+    }, [triggerPsychTest, triggerBalanceGame, triggerQuiz, gameEvent]);
 
-    const activeEvent = gameEvent ?? devEvent;
-    const dismissActive = gameEvent ? dismissEvent : () => setDevEvent(null);
+    const activeEvent = gameEvent;
+    const dismissActive = dismissEvent;
 
     const persona = PERSONAS.find((p) => p.id === state.sessionSettings.selectedPersonaId) ?? PERSONAS[0];
     const isActive = status !== "idle";
