@@ -44,6 +44,7 @@ export function RegisterScreen() {
 
     const [step, setStep] = useState(0);
     const [dir, setDir] = useState(1);
+    const [isLoading, setIsLoading] = useState(false);
 
     // Step 0 — 계정 정보
     const [userId, setUserId] = useState("");
@@ -97,20 +98,53 @@ export function RegisterScreen() {
 
     const DEFAULT_PROFILE_IMAGE = "/assets/profile_default.png";
 
-    const handleSubmit = () => {
-        if (!step2Valid) { setShowErrors2(true); return; }
-        const profile: UserProfile = {
-            userId: userId.trim(),
-            name: name.trim(),
-            gender: gender!,
-            age,
-            interests,
-            mbti: (mbtiAxes as string[]).join(""),
-            bio: bio.trim(),
-            profileImage: profileImage ?? DEFAULT_PROFILE_IMAGE,
-        };
-        dispatch({ type: "SET_USER_PROFILE", payload: profile });
-        router.push("/match");
+    const handleSubmit = async () => {
+        if (!step2Valid || isLoading) { setShowErrors2(true); return; }
+        setIsLoading(true);
+
+        try {
+            const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL ?? "http://localhost:8000";
+            const payload = {
+                userId: userId.trim(),
+                password,
+                name: name.trim(),
+                gender: gender!,
+                age,
+                interests,
+                mbti: (mbtiAxes as string[]).join("") || null,
+                bio: bio.trim() || null,
+                profileImage: profileImage ?? null,
+            };
+
+            const response = await fetch(`${BACKEND_URL}/api/auth/register`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(payload),
+            });
+
+            if (!response.ok) {
+                alert("회원가입에 실패했습니다. (중복된 아이디일 수 있습니다.)");
+                setIsLoading(false);
+                return;
+            }
+
+            const profile: UserProfile = {
+                userId: payload.userId,
+                name: payload.name,
+                gender: payload.gender,
+                age: payload.age,
+                interests: payload.interests,
+                mbti: payload.mbti || "",
+                bio: payload.bio || "",
+                profileImage: payload.profileImage || DEFAULT_PROFILE_IMAGE,
+            };
+            dispatch({ type: "SET_USER_PROFILE", payload: profile });
+            router.push("/match");
+        } catch (error) {
+            console.error("Register Error:", error);
+            alert("서버와 통신할 수 없습니다.");
+            setIsLoading(false);
+        }
     };
 
     const isLastStep = step === 2;
@@ -247,11 +281,12 @@ export function RegisterScreen() {
                         </motion.button>
                         <motion.button
                             onClick={isLastStep ? handleSubmit : goNext}
-                            className="py-4 rounded-2xl font-black text-base"
+                            disabled={isLoading}
+                            className={`py-4 rounded-2xl font-black text-base ${isLoading ? "opacity-40 cursor-not-allowed" : ""}`}
                             style={{ backgroundColor: "#86E3E3", color: "#0A4040" }}
-                            whileTap={{ scale: 0.97 }}
+                            whileTap={!isLoading ? { scale: 0.97 } : {}}
                         >
-                            {isLastStep ? "완료 ✓" : "다음 →"}
+                            {isLastStep ? (isLoading ? "처리 중..." : "완료 ✓") : "다음 →"}
                         </motion.button>
                     </div>
                 )}

@@ -11,14 +11,30 @@ export function LoginScreen() {
 
     const [userId, setUserId] = useState("");
     const [password, setPassword] = useState("");
+    const [isLoading, setIsLoading] = useState(false);
 
-    const handleLogin = () => {
-        if (!userId.trim() || !password) return;
-        // TODO: 실제 로그인 API 연동 (README 참고)
-        // 현재는 mock 처리 — 아이디/이름을 같이 사용
-        dispatch({
-            type: "SET_USER_PROFILE",
-            payload: {
+    const handleLogin = async () => {
+        if (!userId.trim() || !password || isLoading) return;
+        setIsLoading(true);
+
+        try {
+            const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL ?? "http://localhost:8000";
+            const response = await fetch(`${BACKEND_URL}/api/auth/login`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ userId: userId.trim(), password }),
+            });
+
+            if (!response.ok) {
+                alert("로그인에 실패했습니다. 아이디와 비밀번호를 확인해주세요.");
+                setIsLoading(false);
+                return;
+            }
+
+            const data = await response.json();
+
+            // 백엔드가 상세 프로필을 반환하면 사용하고, 없다면 임시로 아이디를 이름으로 사용
+            const userProfile = data.userProfile || {
                 userId: userId.trim(),
                 name: userId.trim(),
                 gender: "male",
@@ -26,9 +42,18 @@ export function LoginScreen() {
                 interests: [],
                 mbti: "",
                 bio: "",
-            },
-        });
-        router.push("/match");
+            };
+
+            dispatch({
+                type: "SET_USER_PROFILE",
+                payload: userProfile,
+            });
+            router.push("/match");
+        } catch (error) {
+            console.error("Login Error:", error);
+            alert("서버와 통신할 수 없습니다.");
+            setIsLoading(false);
+        }
     };
 
     const handleRegister = () => {
@@ -119,12 +144,12 @@ export function LoginScreen() {
                     </motion.button>
                     <motion.button
                         onClick={handleLogin}
-                        disabled={!loginValid}
+                        disabled={!loginValid || isLoading}
                         className="py-4 rounded-2xl font-black text-base disabled:opacity-40 disabled:cursor-not-allowed"
                         style={{ backgroundColor: "#86E3E3", color: "#0A4040" }}
-                        whileTap={{ scale: 0.97 }}
+                        whileTap={!isLoading ? { scale: 0.97 } : {}}
                     >
-                        로그인
+                        {isLoading ? "로그인 중..." : "로그인"}
                     </motion.button>
                 </div>
             </div>
