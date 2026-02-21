@@ -89,6 +89,11 @@ export function useVoiceCapture(): UseVoiceCaptureReturn {
   const isFetchingRef = useRef(false);
   const activeSessionIdRef = useRef<string | null>(null);
 
+  // MediaRecorder refs (for partial audio capture on forceCommit)
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
+  const audioStreamRef = useRef<MediaStream | null>(null);
+
   const { playResponse, close: closeAudio } = useAudioQueue();
 
   const isWaiting = status === "waiting" || isFetchingRef.current;
@@ -119,7 +124,9 @@ export function useVoiceCapture(): UseVoiceCaptureReturn {
 
     try {
       const formData = new FormData();
-      formData.append("file", audioBlob, "audio.wav");
+      // 파일 확장자를 Blob의 mime type에 따라 동적으로 설정
+      const fileName = audioBlob.type.includes("webm") ? "audio.webm" : "audio.wav";
+      formData.append("file", audioBlob, fileName);
 
       let endpoint = "";
       if (activeSessionIdRef.current) {
@@ -173,6 +180,50 @@ export function useVoiceCapture(): UseVoiceCaptureReturn {
     }
   };
 
+  // ── MediaRecorder 제어 로직 ──────────────────────────────────────
+  const startMediaRecorder = async () => {
+    try {
+      if (!audioStreamRef.current) {
+        audioStreamRef.current = await navigator.mediaDevices.getUserMedia({ audio: true });
+      }
+      const stream = audioStreamRef.current;
+      audioChunksRef.current = [];
+
+      const mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm' });
+      mediaRecorderRef.current = mediaRecorder;
+
+      mediaRecorder.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+          audioChunksRef.current.push(event.data);
+        }
+      };
+
+      mediaRecorder.start(100); // Record in 100ms chunks to ensure data availability on quick stops
+      pushLog("○ 오디오 레코딩 시작", "green");
+    } catch (err) {
+      pushLog("✗ 마이크 권한이 제한됨", "red");
+    }
+  };
+
+  const stopAndProcessMediaRecorder = (): Promise<Blob | null> => {
+    return new Promise((resolve) => {
+      const mediaRecorder = mediaRecorderRef.current;
+      if (!mediaRecorder || mediaRecorder.state === "inactive") {
+        resolve(null);
+        return;
+      }
+
+      const handleStop = () => {
+        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+        audioChunksRef.current = [];
+        resolve(audioBlob);
+      };
+
+      mediaRecorder.onstop = handleStop;
+      mediaRecorder.stop();
+    });
+  };
+
   // ── MicVAD 초기화 ────────────────────────────────────────────
   useEffect(() => {
     destroyedRef.current = false;
@@ -183,25 +234,34 @@ export function useVoiceCapture(): UseVoiceCaptureReturn {
       onnxWASMBasePath: "/",
 
       onSpeechStart() {
-        if (isFetchingRef.current) return; // 서버 요청 중이면 채집 안함
+        if (isFetchingRef.current) return;
         pushLog("🎙 사용자가 말하기 시작함", "yellow");
         setStatus((prev) => (prev === "listening" ? "speaking" : prev));
       },
 
-      onSpeechEnd(audio: Float32Array) {
+      async onSpeechEnd(audio: Float32Array) {
         if (isFetchingRef.current) return;
         pushLog("🔇 사용자가 말하기 끝남", "yellow");
         setStatus("waiting");
 
-        // VAD가 제공하는 Float32Array(16kHz)를 WAV Blob으로 변환해서 서버 전송
-        const wavBlob = encodeWAV(audio, 16000);
-        void sendAudioData(wavBlob);
+        // VAD가 끝났으므로 진행 중이던 MediaRecorder 녹음본을 뽑아냄
+        const recordedWebm = await stopAndProcessMediaRecorder();
+
+        // VAD가 제공하는 백업용 Float32Array(16kHz)를 WAV Blob으로 변환 (보조용)
+        const vadWavBlob = encodeWAV(audio, 16000);
+
+        // 브라우저 포맷(WebM)이 있으면 우선 사용하고, 없으면 VAD의 16kHz WAV 사용
+        const finalBlob = recordedWebm && recordedWebm.size > 0 ? recordedWebm : vadWavBlob;
+
+        void sendAudioData(finalBlob);
       },
 
       onVADMisfire() {
         if (isFetchingRef.current) return;
         pushLog("⚡ 의미 없는 소음(VAD misfire)", "red");
         setStatus((prev) => (prev === "speaking" ? "listening" : prev));
+        // Misfire면 레코더 초기화
+        void stopAndProcessMediaRecorder().then(() => startMediaRecorder());
       },
     })
       .then((myvad) => {
@@ -221,30 +281,57 @@ export function useVoiceCapture(): UseVoiceCaptureReturn {
       destroyedRef.current = true;
       const vad = vadRef.current;
       if (vad) { vadRef.current = null; void vad.destroy(); }
+
+      if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
+        mediaRecorderRef.current.stop();
+      }
+      if (audioStreamRef.current) {
+        audioStreamRef.current.getTracks().forEach(track => track.stop());
+      }
+
       closeAudio();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // ── Force commit (아바타 탭) ─────────────────────────────────
-  const forceCommit = useCallback(() => {
+  const forceCommit = useCallback(async () => {
     if (isFetchingRef.current) return;
-    pushLog("👆 아바타 강제 탭! 빈 오디오 전송", "yellow");
+    pushLog("👆 아바타 강제 탭! 누적 오디오 전송", "yellow");
+    setStatus("waiting");
 
-    // 0.5초짜리 짧은 빈 소리를 만들어서 강제 전송
-    const sampleRate = 16000;
-    const durationSec = 0.5;
-    const silentFloat32 = new Float32Array(sampleRate * durationSec);
-    const wavBlob = encodeWAV(silentFloat32, sampleRate);
+    // VAD 강제 일시 정지 (진행 중인 VAD 버퍼링 캔슬용)
+    const vad = vadRef.current;
+    if (vad) void vad.pause();
 
-    void sendAudioData(wavBlob);
-  }, []);
+    // 이때까지 모인 MediaRecorder 녹음본 추출
+    let recordedBlob = await stopAndProcessMediaRecorder();
+
+    // 혹시라도 (너무 빨리 눌러서) 0바이트면 짧은 빈 WAV 생성
+    if (!recordedBlob || recordedBlob.size === 0) {
+      const sampleRate = 16000;
+      const durationSec = 0.5;
+      const silentFloat32 = new Float32Array(sampleRate * durationSec);
+      recordedBlob = encodeWAV(silentFloat32, sampleRate);
+      pushLog("빈 오디오(fallback) 생성됨", "yellow");
+    }
+
+    await sendAudioData(recordedBlob);
+
+    // 처리가 끝나고 idle/listening 상태로 돌아갈때 VAD 재기동
+    if (vadRef.current && !destroyedRef.current) {
+      void vadRef.current.start();
+      void startMediaRecorder(); // 다음 음성 캡처용으로 레코더 재시작
+    }
+
+  }, [sendAudioData, pushLog]);
 
   // ── 세션 시작 / 중지 ─────────────────────────────────────────
   const start = useCallback(() => {
     const vad = vadRef.current;
     if (!vad) return;
     void vad.start();
+    void startMediaRecorder();
     setStatus("listening");
     pushLog("▶ 세션 시작", "green");
   }, [pushLog]);
@@ -252,6 +339,11 @@ export function useVoiceCapture(): UseVoiceCaptureReturn {
   const stop = useCallback(() => {
     const vad = vadRef.current;
     if (vad) void vad.pause();
+
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
+      mediaRecorderRef.current.stop();
+    }
+
     closeAudio();
     activeSessionIdRef.current = null;
     setStatus("idle");
