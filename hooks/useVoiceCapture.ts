@@ -579,6 +579,10 @@ export function useVoiceCapture(): UseVoiceCaptureReturn {
 
         if (customSpeechHandlerRef.current) {
           customSpeechHandlerRef.current(finalBlob);
+          // 핸들러가 서버 요청을 시작하지 않았으면(isFetchingRef 여전히 false) 바로 listening 복귀
+          if (!isFetchingRef.current) {
+            setStatus("listening");
+          }
         } else {
           void sendAudioData(finalBlob);
         }
@@ -642,6 +646,10 @@ export function useVoiceCapture(): UseVoiceCaptureReturn {
 
     if (customSpeechHandlerRef.current) {
       customSpeechHandlerRef.current(recordedBlob);
+      // 핸들러가 서버 요청을 시작하지 않았으면(isFetchingRef 여전히 false) 바로 listening 복귀
+      if (!isFetchingRef.current) {
+        setStatus("listening");
+      }
     } else {
       await sendAudioData(recordedBlob);
     }
