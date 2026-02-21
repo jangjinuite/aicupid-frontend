@@ -132,17 +132,19 @@ export function SessionScreen() {
 
             {/* ── Avatar area ──────────────────────────────────── */}
             <div className="flex-1 flex flex-col items-center justify-center gap-4 px-4 overflow-hidden">
-                <motion.button
-                    onClick={isActive && !isWaiting ? forceCommit : undefined}
-                    className={isActive && !isWaiting ? "cursor-pointer" : "cursor-default"}
-                    whileTap={isActive && !isWaiting ? { scale: 0.97 } : {}}
-                >
-                    <AvatarCore
-                        avatarState={avatarState}
-                        voiceStatus={status}
-                        persona={persona}
-                    />
-                </motion.button>
+                {!activeEvent && (
+                    <motion.button
+                        onClick={isActive && !isWaiting ? forceCommit : undefined}
+                        className={isActive && !isWaiting ? "cursor-pointer" : "cursor-default"}
+                        whileTap={isActive && !isWaiting ? { scale: 0.97 } : {}}
+                    >
+                        <AvatarCore
+                            avatarState={avatarState}
+                            voiceStatus={status}
+                            persona={persona}
+                        />
+                    </motion.button>
+                )}
 
                 {/* Status pill */}
                 <AnimatePresence mode="wait">
@@ -159,7 +161,7 @@ export function SessionScreen() {
                     </motion.span>
                 </AnimatePresence>
 
-                {isActive && !isWaiting && (
+                {!activeEvent && isActive && !isWaiting && (
                     <p className="text-[11px] text-[#1A1A1A]/25 dark:text-white/20 tracking-widest uppercase">
                         탭하여 답변 전송
                     </p>
@@ -211,7 +213,6 @@ export function SessionScreen() {
                         {/* Dim backdrop */}
                         <div
                             className="absolute inset-0 bg-black/40"
-                            onClick={dismissActive}
                         />
 
                         {activeEvent.type === "psych" && (
@@ -222,6 +223,10 @@ export function SessionScreen() {
                                 registerSpeechHandler={registerSpeechHandler}
                                 unregisterSpeechHandler={unregisterSpeechHandler}
                                 submitPsychTestResult={submitPsychTestResult}
+                                persona={persona}
+                                avatarState={avatarState}
+                                forceCommit={forceCommit}
+                                isWaiting={isWaiting}
                             />
                         )}
 
@@ -231,6 +236,10 @@ export function SessionScreen() {
                                 choices={[activeEvent.choices[0] ?? "A", activeEvent.choices[1] ?? "B"]}
                                 voiceStatus={status}
                                 onClose={dismissActive}
+                                persona={persona}
+                                avatarState={avatarState}
+                                forceCommit={forceCommit}
+                                isWaiting={isWaiting}
                             />
                         )}
 
@@ -240,6 +249,10 @@ export function SessionScreen() {
                                 choices={activeEvent.choices}
                                 voiceStatus={status}
                                 onClose={dismissActive}
+                                persona={persona}
+                                avatarState={avatarState}
+                                forceCommit={forceCommit}
+                                isWaiting={isWaiting}
                             />
                         )}
                     </motion.div>

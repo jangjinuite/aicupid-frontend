@@ -5,12 +5,18 @@ import { X } from "lucide-react";
 import { WaveformIndicator } from "@/components/session/WaveformIndicator";
 import { modalCardVariants } from "@/lib/animations";
 import type { VoiceStatus } from "@/hooks/useVoiceCapture";
+import type { Persona, AvatarState } from "@/types";
+import { AvatarCore } from "@/components/session/AvatarCore";
 
 interface QuizPopupProps {
     question: string;
     choices: string[];
     voiceStatus: VoiceStatus;
     onClose: () => void;
+    persona: Persona;
+    avatarState: AvatarState;
+    forceCommit: () => void;
+    isWaiting: boolean;
 }
 
 const CHOICE_STYLES = [
@@ -25,6 +31,10 @@ export function QuizPopup({
     choices,
     voiceStatus,
     onClose,
+    persona,
+    avatarState,
+    forceCommit,
+    isWaiting,
 }: QuizPopupProps) {
     const displayChoices = choices.slice(0, 4);
 
@@ -41,12 +51,6 @@ export function QuizPopup({
                 <span className="text-xs font-bold tracking-widest uppercase" style={{ color: "#E6D08E" }}>
                     퀴즈
                 </span>
-                <button
-                    onClick={onClose}
-                    className="w-8 h-8 rounded-full bg-black/5 dark:bg-white/10 flex items-center justify-center"
-                >
-                    <X className="w-4 h-4 text-[#1A1A1A] dark:text-[#F0F0F0]" />
-                </button>
             </div>
 
             {/* Question */}
@@ -83,13 +87,26 @@ export function QuizPopup({
             </div>
 
             {/* Voice hint */}
-            <p className="px-6 pb-2 text-xs text-[#1A1A1A]/40 dark:text-white/30 text-center">
-                A, B, C, D 중 음성으로 답변해 주세요
-            </p>
+            {voiceStatus !== "idle" && !isWaiting && (
+                <p className="px-6 pb-2 text-[10px] text-[#1A1A1A]/40 dark:text-white/30 text-center tracking-widest uppercase">
+                    원하는 보기를 읽은 후 아바타를 탭하세요
+                </p>
+            )}
 
-            {/* Voice indicator */}
-            <div className="px-6 pb-6">
-                <WaveformIndicator status={voiceStatus} />
+            {/* Avatar / Voice indicator */}
+            <div className="px-6 pb-6 pt-2 flex justify-center">
+                <motion.button
+                    onClick={voiceStatus !== "idle" && !isWaiting ? forceCommit : undefined}
+                    className={voiceStatus !== "idle" && !isWaiting ? "cursor-pointer" : "cursor-default"}
+                    whileTap={voiceStatus !== "idle" && !isWaiting ? { scale: 0.95 } : {}}
+                    style={{ transform: "scale(0.8)" }} // Make it slightly smaller in popup
+                >
+                    <AvatarCore
+                        avatarState={avatarState}
+                        voiceStatus={voiceStatus}
+                        persona={persona}
+                    />
+                </motion.button>
             </div>
         </motion.div>
     );

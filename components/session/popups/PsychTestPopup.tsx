@@ -6,6 +6,8 @@ import { X } from "lucide-react";
 import { WaveformIndicator } from "@/components/session/WaveformIndicator";
 import { modalCardVariants } from "@/lib/animations";
 import type { VoiceStatus } from "@/hooks/useVoiceCapture";
+import type { Persona, AvatarState } from "@/types";
+import { AvatarCore } from "@/components/session/AvatarCore";
 
 interface PsychTestPopupProps {
     question: string;
@@ -18,6 +20,10 @@ interface PsychTestPopupProps {
     registerSpeechHandler?: (handler: (blob: Blob) => void) => void;
     unregisterSpeechHandler?: () => void;
     submitPsychTestResult?: (blob1: Blob, blob2: Blob) => Promise<any>;
+    persona: Persona;
+    avatarState: AvatarState;
+    forceCommit: () => void;
+    isWaiting: boolean;
 }
 
 export function PsychTestPopup({
@@ -29,6 +35,10 @@ export function PsychTestPopup({
     registerSpeechHandler,
     unregisterSpeechHandler,
     submitPsychTestResult,
+    persona,
+    avatarState,
+    forceCommit,
+    isWaiting,
 }: PsychTestPopupProps) {
     const [currentIdx, setCurrentIdx] = useState(0); // 0=P1, 1=P2, 2=loading, 3=result
     const [finalResult, setFinalResult] = useState<string | null>(null);
@@ -89,12 +99,6 @@ export function PsychTestPopup({
                 <span className="text-xs font-bold tracking-widest uppercase text-primary">
                     심리 테스트
                 </span>
-                <button
-                    onClick={onClose}
-                    className="w-8 h-8 rounded-full bg-black/5 dark:bg-white/10 flex items-center justify-center"
-                >
-                    <X className="w-4 h-4 text-[#1A1A1A] dark:text-[#F0F0F0]" />
-                </button>
             </div>
 
             {/* Question */}
@@ -162,9 +166,25 @@ export function PsychTestPopup({
                 )}
             </div>
 
-            {/* Voice indicator */}
-            <div className="px-6 py-3">
-                <WaveformIndicator status={voiceStatus} />
+            {/* Avatar / Voice indicator */}
+            <div className="px-6 py-4 flex flex-col items-center justify-center gap-3">
+                <motion.button
+                    onClick={voiceStatus !== "idle" && !isWaiting ? forceCommit : undefined}
+                    className={voiceStatus !== "idle" && !isWaiting ? "cursor-pointer" : "cursor-default"}
+                    whileTap={voiceStatus !== "idle" && !isWaiting ? { scale: 0.95 } : {}}
+                    style={{ transform: "scale(0.8)" }} // Make it slightly smaller in popup
+                >
+                    <AvatarCore
+                        avatarState={avatarState}
+                        voiceStatus={voiceStatus}
+                        persona={persona}
+                    />
+                </motion.button>
+                {voiceStatus !== "idle" && !isWaiting && currentIdx < 2 && (
+                    <p className="text-[10px] text-[#1A1A1A]/30 dark:text-white/20 tracking-widest uppercase">
+                        입력이 끝나면 아바타를 탭하세요
+                    </p>
+                )}
             </div>
 
             {/* Next / Done button */}
