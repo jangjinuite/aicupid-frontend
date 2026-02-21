@@ -191,16 +191,16 @@ export function useVoiceCapture(): UseVoiceCaptureReturn {
   }, []);
 
   // ── speech_end 전송 공통 헬퍼 ────────────────────────────────
-  const sendSpeechEnd = useCallback(() => {
+  const sendSpeechEnd = useCallback((isForce = false) => {
     const ws = wsRef.current;
     if (!ws || ws.readyState !== WebSocket.OPEN) {
-      pushLog("✗ speech_end: WS 미연결", "red");
+      pushLog(`✗ ${isForce ? "force_commit" : "speech_end"}: WS 미연결`, "red");
       return;
     }
     const chunks = chunkCountRef.current;
     chunkCountRef.current = 0;
-    pushLog(`▶ speech_end 전송 (청크 ${chunks}개, ${sampleRateRef.current}Hz)`, "green");
-    ws.send(JSON.stringify({ type: "speech_end", sample_rate: sampleRateRef.current }));
+    pushLog(`▶ ${isForce ? "force_commit" : "speech_end"} 전송 (청크 ${chunks}개, ${sampleRateRef.current}Hz)`, "green");
+    ws.send(JSON.stringify({ type: isForce ? "force_commit" : "speech_end", sample_rate: sampleRateRef.current }));
   }, [pushLog]);
 
   // ── MicVAD 초기화 ────────────────────────────────────────────
@@ -267,7 +267,7 @@ export function useVoiceCapture(): UseVoiceCaptureReturn {
     }
     pushLog("👆 FORCE COMMIT", "yellow");
     isSpeakingRef.current = false;  // 청크 전송 즉시 중단
-    sendSpeechEnd();
+    sendSpeechEnd(true); // Send 'force_commit' instead of 'speech_end'
     setStatus("waiting");
   }, [pushLog, sendSpeechEnd]);
 

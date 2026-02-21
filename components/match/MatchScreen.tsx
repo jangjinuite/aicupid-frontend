@@ -3,34 +3,13 @@
 import { useState, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useRouter } from "next/navigation";
-import { Search, X, ChevronLeft } from "lucide-react";
+import { Search, X, ChevronLeft, User } from "lucide-react";
 import { useAppContext } from "@/context/AppContext";
+import { ProfileEditModal } from "@/components/profile/ProfileEditModal";
 import { MOCK_USERS } from "@/lib/mockData";
 import type { MatchedUser } from "@/types";
 
-// ── Avatar placeholder ────────────────────────────────────────────
-function UserAvatar({ user, size = 56 }: { user: MatchedUser; size?: number }) {
-    return (
-        <div
-            className="rounded-full overflow-hidden flex items-center justify-center shrink-0"
-            style={{
-                width: size,
-                height: size,
-                backgroundColor: "#F0FAFA",
-                border: "2px solid #B8F0F0",
-            }}
-        >
-            {user.profileImage ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={user.profileImage} alt={user.name} className="w-full h-full object-cover" />
-            ) : (
-                <span style={{ fontSize: size * 0.45 }}>
-                    {user.gender === "female" ? "👩" : "👨"}
-                </span>
-            )}
-        </div>
-    );
-}
+const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL ?? "http://localhost:8000";
 
 // ── User list row ─────────────────────────────────────────────────
 function UserRow({
@@ -45,7 +24,7 @@ function UserRow({
     return (
         <motion.button
             onClick={onClick}
-            className="w-full flex items-center gap-4 px-4 py-4 rounded-2xl transition-all text-left"
+            className="w-full flex items-center justify-between px-5 py-4 rounded-2xl transition-all text-left"
             style={{
                 backgroundColor: selected ? "#B8F0F0" : "#F6FAFA",
                 border: "2px solid",
@@ -53,23 +32,9 @@ function UserRow({
             }}
             whileTap={{ scale: 0.98 }}
         >
-            <UserAvatar user={user} size={52} />
-            <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 mb-0.5">
-                    <span className="font-black text-base text-[#1A1A1A] dark:text-[#F0F0F0]">
-                        {user.name}
-                    </span>
-                    <span className="text-xs font-bold px-2 py-0.5 rounded-full" style={{ backgroundColor: "#F5E9BB", color: "#4A3800" }}>
-                        {user.mbti}
-                    </span>
-                    <span className="text-xs text-[#1A1A1A]/40 dark:text-white/30">
-                        {user.age}세
-                    </span>
-                </div>
-                <p className="text-sm text-[#1A1A1A]/55 dark:text-white/40 truncate">
-                    {user.bio || user.interests.join(", ")}
-                </p>
-            </div>
+            <span className="font-black text-base text-[#1A1A1A] dark:text-[#F0F0F0]">
+                {user.userId}
+            </span>
             {selected && (
                 <div
                     className="w-5 h-5 rounded-full flex items-center justify-center shrink-0"
@@ -88,35 +53,13 @@ function ConfirmCard({ user }: { user: MatchedUser }) {
         <motion.div
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
-            className="w-full flex items-center gap-4 px-5 py-5 rounded-3xl"
+            className="w-full flex items-center px-5 py-5 rounded-3xl"
             style={{
                 backgroundColor: "#B8F0F0",
                 border: "2px solid #86E3E3",
             }}
         >
-            <UserAvatar user={user} size={64} />
-            <div>
-                <div className="flex items-center gap-2 mb-1">
-                    <span className="font-black text-lg text-[#0A4040]">{user.name}</span>
-                    <span className="text-xs font-bold px-2 py-0.5 rounded-full" style={{ backgroundColor: "#86E3E3", color: "#0A4040" }}>
-                        {user.mbti}
-                    </span>
-                </div>
-                <p className="text-sm text-[#0A4040]/70 leading-snug">
-                    {user.bio || user.interests.join(", ")}
-                </p>
-                <div className="flex gap-1 flex-wrap mt-2">
-                    {user.interests.slice(0, 3).map(i => (
-                        <span
-                            key={i}
-                            className="text-xs px-2 py-0.5 rounded-full font-semibold"
-                            style={{ backgroundColor: "rgba(255,255,255,0.6)", color: "#0A4040" }}
-                        >
-                            {i}
-                        </span>
-                    ))}
-                </div>
-            </div>
+            <span className="font-black text-xl text-[#0A4040]">{user.userId}</span>
         </motion.div>
     );
 }
@@ -124,20 +67,17 @@ function ConfirmCard({ user }: { user: MatchedUser }) {
 // ── Main component ────────────────────────────────────────────────
 export function MatchScreen() {
     const router = useRouter();
-    const { dispatch } = useAppContext();
+    const { state, dispatch } = useAppContext();
 
     const [query, setQuery] = useState("");
     const [selected, setSelected] = useState<MatchedUser | null>(null);
     const [confirming, setConfirming] = useState(false);
+    const [showEditModal, setShowEditModal] = useState(false);
 
     const filtered = useMemo(() => {
         if (!query.trim()) return MOCK_USERS;
         const q = query.toLowerCase();
-        return MOCK_USERS.filter(
-            u =>
-                u.userId.toLowerCase().includes(q) ||
-                u.name.toLowerCase().includes(q)
-        );
+        return MOCK_USERS.filter(u => u.userId.toLowerCase().includes(q));
     }, [query]);
 
     const handleSelect = (user: MatchedUser) => {
@@ -155,9 +95,20 @@ export function MatchScreen() {
         setConfirming(false);
     };
 
-    const handleConfirm = () => {
+    const handleConfirm = async () => {
         if (!selected) return;
+        // 1) 클라이언트 state에 저장
         dispatch({ type: "SET_MATCHED_USER", payload: selected });
+        // 2) 백엔드에 파트너 userId 전달
+        try {
+            await fetch(`${BACKEND_URL}/session/partner`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ partner_user_id: selected.userId }),
+            });
+        } catch (e) {
+            console.warn("[MatchScreen] 파트너 정보 전달 실패", e);
+        }
         router.push("/");
     };
 
@@ -214,7 +165,7 @@ export function MatchScreen() {
                             type="text"
                             value={query}
                             onChange={e => setQuery(e.target.value)}
-                            placeholder="아이디 또는 이름으로 검색"
+                            placeholder="아이디로 검색"
                             className="w-full pl-10 pr-10 py-4 rounded-2xl text-base font-semibold outline-none bg-[#F6FAFA] dark:bg-[#2C2C2E] text-[#1A1A1A] dark:text-[#F0F0F0] placeholder:text-[#1A1A1A]/30 dark:placeholder:text-white/25"
                             style={{
                                 border: "2px solid",
@@ -295,6 +246,20 @@ export function MatchScreen() {
                     </motion.button>
                 )}
             </div>
+
+            {/* Edit Profile Modal Content Overlay */}
+            <AnimatePresence>
+                {showEditModal && state.userProfile && (
+                    <ProfileEditModal
+                        initialProfile={state.userProfile}
+                        onSave={(updated) => {
+                            dispatch({ type: "SET_USER_PROFILE", payload: updated });
+                            setShowEditModal(false);
+                        }}
+                        onClose={() => setShowEditModal(false)}
+                    />
+                )}
+            </AnimatePresence>
         </div>
     );
 }

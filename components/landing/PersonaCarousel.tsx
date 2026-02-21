@@ -52,12 +52,21 @@ export function PersonaCarousel({ personas, selectedId, onSelect, onStart }: Per
                             className="flex flex-col items-center gap-4"
                         >
                             {/* Avatar */}
-                            <div
-                                className="w-32 h-32 rounded-full flex items-center justify-center border-[3px] border-primary"
-                                style={{ background: "#F0FAFA" }}
+                            <motion.div
+                                layoutId="avatar"
+                                className="w-48 h-48 flex items-center justify-center border-[3px] border-primary overflow-hidden"
+                                style={{ background: "#F0FAFA", borderRadius: "50%" }}
                             >
-                                <span className="text-5xl select-none">{persona.emoji}</span>
-                            </div>
+                                {persona.image ? (
+                                    <img
+                                        src={persona.image}
+                                        alt={persona.name}
+                                        className="w-full h-full object-cover"
+                                    />
+                                ) : (
+                                    <span className="text-5xl select-none">{persona.emoji}</span>
+                                )}
+                            </motion.div>
 
                             {/* Name & description */}
                             <div className="text-center">

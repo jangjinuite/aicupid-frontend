@@ -11,16 +11,17 @@ import { WaveformIndicator } from "./WaveformIndicator";
 import { PsychTestPopup } from "./popups/PsychTestPopup";
 import { BalanceGamePopup } from "./popups/BalanceGamePopup";
 import { QuizPopup } from "./popups/QuizPopup";
+import { ActionModal } from "@/components/shared/ActionModal";
 import { PERSONAS } from "@/lib/mockData";
 import { popupVariants } from "@/lib/animations";
 import type { GameEvent } from "@/types";
 
 const STATUS_PILL: Record<string, { label: string; bg: string; text: string }> = {
-    idle:        { label: "● 대기",      bg: "#F0F0F0",  text: "#9CA3AF" },
-    listening:   { label: "◉ 듣는 중",  bg: "#B8F0F0",  text: "#0A4040" },
-    speaking:    { label: "🎙 녹음 중", bg: "#FDCFF7",  text: "#4A0A40" },
-    ai_speaking: { label: "🔊 AI 응답", bg: "#F5E9BB",  text: "#4A3800" },
-    waiting:     { label: "⏳ 처리 중", bg: "#F5E9BB",  text: "#4A3800" },
+    idle: { label: "● 대기", bg: "#F0F0F0", text: "#9CA3AF" },
+    listening: { label: "◉ 듣는 중", bg: "#B8F0F0", text: "#0A4040" },
+    speaking: { label: "🎙 녹음 중", bg: "#FDCFF7", text: "#4A0A40" },
+    ai_speaking: { label: "🔊 AI 응답", bg: "#F5E9BB", text: "#4A3800" },
+    waiting: { label: "⏳ 처리 중", bg: "#F5E9BB", text: "#4A3800" },
 };
 
 // ── Dev test fixtures (keyboard 1/2/3) ───────────────────────
@@ -52,6 +53,15 @@ export function SessionScreen() {
     } = useVoiceCapture();
 
     const [devEvent, setDevEvent] = useState<GameEvent | null>(null);
+    const [showStopModal, setShowStopModal] = useState(false);
+
+    useEffect(() => {
+        // Auto-start session immediately when VAD is loaded (not loading)
+        // instead of waiting for wsStatus === "connected" which only happens after start().
+        if (!loading && status === "idle") {
+            start();
+        }
+    }, [loading, status, start]);
 
     useEffect(() => {
         const handler = (e: KeyboardEvent) => {
@@ -73,20 +83,28 @@ export function SessionScreen() {
     const handleBack = () => {
         stop();
         dispatch({ type: "GO_LANDING" });
-        router.push("/");
     };
 
-    const handleStop = () => {
+    const handleStopClick = () => {
+        setShowStopModal(true);
+    };
+
+    const confirmStop = () => {
+        setShowStopModal(false);
         stop();
-        // TODO: 실제 구현 시 AI 요약 생성 후 SET_SESSION_SUMMARY dispatch (README 참고)
+        // 실제 AI 요약 구현이 필요
         dispatch({ type: "SET_SESSION_SUMMARY", payload: "" });
         router.push("/summary");
     };
 
     return (
-        <div
-            className="relative flex flex-col bg-white dark:bg-dark-bg overflow-hidden mx-auto w-full"
-            style={{ height: "100dvh", maxWidth: 430 }}
+        <motion.div
+            className="absolute inset-0 flex flex-col bg-white dark:bg-dark-bg overflow-hidden mx-auto w-full z-20"
+            style={{ maxWidth: 430 }}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.25 }}
         >
             {/* ── Top nav ──────────────────────────────────────── */}
             <div
@@ -112,10 +130,10 @@ export function SessionScreen() {
                         className="w-2 h-2 rounded-full"
                         style={{
                             backgroundColor:
-                                wsStatus === "connected"  ? "#86E3E3"
-                                : wsStatus === "connecting" ? "#E6D08E"
-                                : wsStatus === "error"      ? "#EF4444"
-                                : "#9CA3AF",
+                                wsStatus === "connected" ? "#86E3E3"
+                                    : wsStatus === "connecting" ? "#E6D08E"
+                                        : wsStatus === "error" ? "#EF4444"
+                                            : "#9CA3AF",
                             boxShadow: wsConnected ? "0 0 6px #86E3E3" : "none",
                         }}
                     />
@@ -126,12 +144,7 @@ export function SessionScreen() {
             </div>
 
             {/* ── Avatar area ──────────────────────────────────── */}
-            <motion.div
-                className="flex-1 flex flex-col items-center justify-center gap-4 px-4 overflow-hidden"
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ type: "spring", stiffness: 200, damping: 24, delay: 0.08 }}
-            >
+            <div className="flex-1 flex flex-col items-center justify-center gap-4 px-4 overflow-hidden">
                 <motion.button
                     onClick={isActive && !isWaiting ? forceCommit : undefined}
                     className={isActive && !isWaiting ? "cursor-pointer" : "cursor-default"}
@@ -173,7 +186,7 @@ export function SessionScreen() {
                 <p className="text-[10px] text-[#1A1A1A]/18 dark:text-white/12 font-mono">
                     [dev] 키보드 1=심리 2=밸런스 3=퀴즈
                 </p>
-            </motion.div>
+            </div>
 
             {/* ── Bottom controls ───────────────────────────────── */}
             <div
@@ -182,7 +195,7 @@ export function SessionScreen() {
             >
                 {/* Start / Stop */}
                 <motion.button
-                    onClick={isActive ? handleStop : start}
+                    onClick={isActive ? handleStopClick : start}
                     disabled={loading || !!error}
                     className="w-full py-4 rounded-2xl font-black text-base disabled:opacity-40 disabled:cursor-not-allowed"
                     style={{
@@ -244,7 +257,16 @@ export function SessionScreen() {
                         )}
                     </motion.div>
                 )}
+                {showStopModal && (
+                    <ActionModal
+                        title={"AI CUPID의 현재 세션을\n종료하시겠습니까?"}
+                        onConfirmText="예"
+                        onCancelText="아니오"
+                        onConfirm={confirmStop}
+                        onCancel={() => setShowStopModal(false)}
+                    />
+                )}
             </AnimatePresence>
-        </div>
+        </motion.div>
     );
 }

@@ -58,10 +58,20 @@ export function RegisterScreen() {
     const [interests, setInterests] = useState<string[]>([]);
 
     // Step 2 — 추가 정보
-    const [mbtiAxes, setMbtiAxes] = useState(["E", "S", "T", "J"]);
+    const [mbtiAxes, setMbtiAxes] = useState<(string | null)[]>([null, null, null, null]);
     const [bio, setBio] = useState("");
 
-    const goNext = () => { setDir(1); setStep(s => s + 1); };
+    // 에러 표시 상태 (다음/완료 클릭 시 활성화)
+    const [showErrors0, setShowErrors0] = useState(false);
+    const [showErrors1, setShowErrors1] = useState(false);
+    const [showErrors2, setShowErrors2] = useState(false);
+
+    const goNext = () => {
+        if (step === 0 && !step0Valid) { setShowErrors0(true); return; }
+        if (step === 1 && !step1Valid) { setShowErrors1(true); return; }
+        setDir(1);
+        setStep(s => s + 1);
+    };
     const goBack = () => { setDir(-1); setStep(s => s - 1); };
 
     const handleImagePick = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -83,17 +93,21 @@ export function RegisterScreen() {
     const pwMatch = passwordConfirm === "" || password === passwordConfirm;
     const step0Valid = userId.trim().length >= 2 && password.length >= 4 && password === passwordConfirm;
     const step1Valid = name.trim().length > 0 && gender !== null && interests.length > 0;
+    const step2Valid = mbtiAxes.every(v => v !== null) && bio.trim().length > 0;
+
+    const DEFAULT_PROFILE_IMAGE = "/assets/profile_default.png";
 
     const handleSubmit = () => {
+        if (!step2Valid) { setShowErrors2(true); return; }
         const profile: UserProfile = {
             userId: userId.trim(),
             name: name.trim(),
             gender: gender!,
             age,
             interests,
-            mbti: mbtiAxes.join(""),
+            mbti: (mbtiAxes as string[]).join(""),
             bio: bio.trim(),
-            profileImage: profileImage ?? undefined,
+            profileImage: profileImage ?? DEFAULT_PROFILE_IMAGE,
         };
         dispatch({ type: "SET_USER_PROFILE", payload: profile });
         router.push("/match");
@@ -172,16 +186,22 @@ export function RegisterScreen() {
                             <Step1Profile
                                 name={name} setName={setName}
                                 profileImage={profileImage}
+                                defaultProfileImage="/assets/profile_default.png"
                                 onImageClick={() => fileInputRef.current?.click()}
                                 gender={gender} setGender={setGender}
                                 age={age} setAge={setAge}
                                 interests={interests} toggleInterest={toggleInterest}
+                                showErrors={showErrors1}
                             />
                         )}
                         {step === 2 && (
                             <Step2Extra
-                                mbtiAxes={mbtiAxes} toggleMbti={toggleMbti}
+                                mbtiAxes={mbtiAxes} toggleMbti={(axis, value) => {
+                                    setMbtiAxes(prev => { const n = [...prev]; n[axis] = value; return n; });
+                                    setShowErrors2(false);
+                                }}
                                 bio={bio} setBio={setBio}
+                                showErrors={showErrors2}
                             />
                         )}
                     </motion.div>
@@ -205,8 +225,7 @@ export function RegisterScreen() {
                 {step === 0 ? (
                     <motion.button
                         onClick={goNext}
-                        disabled={!step0Valid}
-                        className="w-full py-4 rounded-2xl font-black text-base disabled:opacity-40 disabled:cursor-not-allowed"
+                        className="w-full py-4 rounded-2xl font-black text-base"
                         style={{ backgroundColor: "#86E3E3", color: "#0A4040" }}
                         whileTap={{ scale: 0.97 }}
                     >
@@ -228,8 +247,7 @@ export function RegisterScreen() {
                         </motion.button>
                         <motion.button
                             onClick={isLastStep ? handleSubmit : goNext}
-                            disabled={step === 1 ? !step1Valid : false}
-                            className="py-4 rounded-2xl font-black text-base disabled:opacity-40 disabled:cursor-not-allowed"
+                            className="py-4 rounded-2xl font-black text-base"
                             style={{ backgroundColor: "#86E3E3", color: "#0A4040" }}
                             whileTap={{ scale: 0.97 }}
                         >
@@ -315,13 +333,14 @@ function Step0Account({ userId, setUserId, password, setPassword, passwordConfir
 // ── Step 1: 프로필 정보 ───────────────────────────────────────────
 interface Step1Props {
     name: string; setName: (v: string) => void;
-    profileImage: string | null; onImageClick: () => void;
+    profileImage: string | null; defaultProfileImage: string; onImageClick: () => void;
     gender: "male" | "female" | null; setGender: (v: "male" | "female") => void;
     age: number; setAge: (v: number) => void;
     interests: string[]; toggleInterest: (label: string) => void;
+    showErrors: boolean;
 }
 
-function Step1Profile({ name, setName, profileImage, onImageClick, gender, setGender, age, setAge, interests, toggleInterest }: Step1Props) {
+function Step1Profile({ name, setName, profileImage, defaultProfileImage, onImageClick, gender, setGender, age, setAge, interests, toggleInterest, showErrors }: Step1Props) {
     const inputClass = "w-full px-4 py-4 rounded-2xl text-base font-semibold outline-none bg-[#F6FAFA] dark:bg-[#2C2C2E] text-[#1A1A1A] dark:text-[#F0F0F0] placeholder:text-[#1A1A1A]/30 dark:placeholder:text-white/25";
 
     return (
@@ -342,14 +361,17 @@ function Step1Profile({ name, setName, profileImage, onImageClick, gender, setGe
                     onChange={e => setName(e.target.value)}
                     placeholder="이름을 입력해주세요"
                     maxLength={10}
-                    className={inputClass}
+                    className={`${inputClass} ${showErrors && !name ? "error-pulse" : ""}`}
                     style={{ border: "2px solid", borderColor: name ? "#86E3E3" : "transparent" }}
                 />
             </div>
 
-            {/* 프로필 사진 */}
+            {/* 프로필 사진 (선택) */}
             <div className="flex flex-col gap-2">
-                <label className="text-sm font-bold text-[#1A1A1A] dark:text-[#F0F0F0]">프로필</label>
+                <label className="text-sm font-bold text-[#1A1A1A] dark:text-[#F0F0F0]">
+                    프로필{" "}
+                    <span className="text-[#1A1A1A]/40 dark:text-white/30 font-normal">(선택)</span>
+                </label>
                 <button
                     onClick={onImageClick}
                     className="relative self-start"
@@ -364,16 +386,12 @@ function Step1Profile({ name, setName, profileImage, onImageClick, gender, setGe
                             borderColor: profileImage ? "#86E3E3" : "#E5E7EB",
                         }}
                     >
-                        {profileImage ? (
-                            // eslint-disable-next-line @next/next/no-img-element
-                            <img
-                                src={profileImage}
-                                alt="프로필"
-                                className="w-full h-full object-cover"
-                            />
-                        ) : (
-                            <Camera className="w-7 h-7" style={{ color: "#86E3E3" }} />
-                        )}
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                            src={profileImage ?? defaultProfileImage}
+                            alt="프로필"
+                            className="w-full h-full object-cover"
+                        />
                     </div>
                     {/* Edit badge */}
                     <div
@@ -393,7 +411,7 @@ function Step1Profile({ name, setName, profileImage, onImageClick, gender, setGe
                         <button
                             key={g}
                             onClick={() => setGender(g)}
-                            className="py-4 rounded-2xl font-black text-base transition-all"
+                            className={`py-4 rounded-2xl font-black text-base transition-all ${showErrors && !gender && g === "male" ? "error-pulse" : ""}`}
                             style={{
                                 backgroundColor: gender === g ? "#86E3E3" : "#F6FAFA",
                                 color: gender === g ? "#0A4040" : "#6B7280",
@@ -417,7 +435,7 @@ function Step1Profile({ name, setName, profileImage, onImageClick, gender, setGe
                         style={{ backgroundColor: "#F6FAFA", border: "2px solid #86E3E3" }}
                     >
                         <button
-                            onClick={() => setAge(a => Math.max(1, a - 1))}
+                            onClick={() => setAge(Math.max(1, age - 1))}
                             className="px-4 py-3 font-black text-xl transition-colors active:bg-[#B8F0F0]"
                             style={{ color: "#86E3E3" }}
                         >
@@ -427,7 +445,7 @@ function Step1Profile({ name, setName, profileImage, onImageClick, gender, setGe
                             {age}
                         </span>
                         <button
-                            onClick={() => setAge(a => Math.min(99, a + 1))}
+                            onClick={() => setAge(Math.min(100, age + 1))}
                             className="px-4 py-3 font-black text-xl transition-colors active:bg-[#B8F0F0]"
                             style={{ color: "#86E3E3" }}
                         >
@@ -443,6 +461,9 @@ function Step1Profile({ name, setName, profileImage, onImageClick, gender, setGe
                 <label className="text-sm font-bold text-[#1A1A1A] dark:text-[#F0F0F0]">
                     관심사{" "}
                     <span className="text-[#1A1A1A]/40 dark:text-white/30 font-normal">(중복 선택 가능)</span>
+                    {showErrors && interests.length === 0 && (
+                        <span className="ml-2 text-xs font-semibold" style={{ color: "#EF4444" }}>최소 1개 선택</span>
+                    )}
                 </label>
                 <div className="flex flex-wrap gap-2">
                     {INTERESTS.map(({ label, emoji }) => {
@@ -451,7 +472,7 @@ function Step1Profile({ name, setName, profileImage, onImageClick, gender, setGe
                             <button
                                 key={label}
                                 onClick={() => toggleInterest(label)}
-                                className="flex items-center gap-1.5 px-3.5 py-2.5 rounded-2xl font-bold text-sm transition-all"
+                                className={`flex items-center gap-1.5 px-3.5 py-2.5 rounded-2xl font-bold text-sm transition-all ${showErrors && interests.length === 0 ? "error-pulse" : ""}`}
                                 style={{
                                     backgroundColor: selected ? "#86E3E3" : "#F6FAFA",
                                     color: selected ? "#0A4040" : "#6B7280",
@@ -472,11 +493,12 @@ function Step1Profile({ name, setName, profileImage, onImageClick, gender, setGe
 
 // ── Step 2: 추가 정보 ─────────────────────────────────────────────
 interface Step2Props {
-    mbtiAxes: string[]; toggleMbti: (axis: number, value: string) => void;
+    mbtiAxes: (string | null)[]; toggleMbti: (axis: number, value: string) => void;
     bio: string; setBio: (v: string) => void;
+    showErrors: boolean;
 }
 
-function Step2Extra({ mbtiAxes, toggleMbti, bio, setBio }: Step2Props) {
+function Step2Extra({ mbtiAxes, toggleMbti, bio, setBio, showErrors }: Step2Props) {
     return (
         <div className="flex flex-col gap-6 pt-2">
             <div>
@@ -490,7 +512,10 @@ function Step2Extra({ mbtiAxes, toggleMbti, bio, setBio }: Step2Props) {
             <div className="flex flex-col gap-3">
                 <label className="text-sm font-bold text-[#1A1A1A] dark:text-[#F0F0F0]">
                     MBTI{" "}
-                    <span className="font-black" style={{ color: "#86E3E3" }}>{mbtiAxes.join("")}</span>
+                    <span className="font-black" style={{ color: "#86E3E3" }}>{mbtiAxes.filter(Boolean).join("") || "?"}</span>
+                    {showErrors && mbtiAxes.some(v => !v) && (
+                        <span className="ml-2 text-xs font-semibold" style={{ color: "#EF4444" }}>MBTI를 모두 선택해주세요</span>
+                    )}
                 </label>
                 {MBTI_AXES.map((axis, i) => (
                     <div key={i} className="grid grid-cols-2 gap-2">
@@ -498,7 +523,7 @@ function Step2Extra({ mbtiAxes, toggleMbti, bio, setBio }: Step2Props) {
                             <button
                                 key={opt.val}
                                 onClick={() => toggleMbti(i, opt.val)}
-                                className="py-3 rounded-2xl font-bold text-sm transition-all"
+                                className={`py-3 rounded-2xl font-bold text-sm transition-all ${showErrors && !mbtiAxes[i] ? "error-pulse" : ""}`}
                                 style={{
                                     backgroundColor: mbtiAxes[i] === opt.val ? "#86E3E3" : "#F6FAFA",
                                     color: mbtiAxes[i] === opt.val ? "#0A4040" : "#6B7280",
@@ -516,18 +541,20 @@ function Step2Extra({ mbtiAxes, toggleMbti, bio, setBio }: Step2Props) {
             {/* 자기소개 */}
             <div className="flex flex-col gap-2">
                 <label className="text-sm font-bold text-[#1A1A1A] dark:text-[#F0F0F0]">
-                    자기소개{" "}
-                    <span className="text-[#1A1A1A]/40 dark:text-white/30 font-normal">(선택)</span>
+                    자기소개
+                    {showErrors && bio.trim().length === 0 && (
+                        <span className="ml-2 text-xs font-semibold" style={{ color: "#EF4444" }}>자기소개를 입력해주세요</span>
+                    )}
                 </label>
                 <textarea
                     value={bio}
                     onChange={e => setBio(e.target.value.slice(0, MAX_BIO))}
                     placeholder="간단하게 자신을 소개해주세요. AI 큐피드가 더 잘 맞춰드릴 수 있어요!"
                     rows={5}
-                    className="w-full px-4 py-3.5 rounded-2xl text-sm font-medium outline-none resize-none bg-[#F6FAFA] dark:bg-[#2C2C2E] text-[#1A1A1A] dark:text-[#F0F0F0] placeholder:text-[#1A1A1A]/30 dark:placeholder:text-white/25 leading-relaxed"
+                    className={`w-full px-4 py-3.5 rounded-2xl text-sm font-medium outline-none resize-none bg-[#F6FAFA] dark:bg-[#2C2C2E] text-[#1A1A1A] dark:text-[#F0F0F0] placeholder:text-[#1A1A1A]/30 dark:placeholder:text-white/25 leading-relaxed ${showErrors && bio.trim().length === 0 ? "error-pulse" : ""}`}
                     style={{
                         border: "2px solid",
-                        borderColor: bio ? "#86E3E3" : "transparent",
+                        borderColor: showErrors && bio.trim().length === 0 ? "#EF4444" : bio ? "#86E3E3" : "transparent",
                     }}
                 />
                 <p className="text-right text-xs text-[#1A1A1A]/30 dark:text-white/25 font-mono">

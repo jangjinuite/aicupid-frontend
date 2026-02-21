@@ -34,9 +34,10 @@ export function AvatarCore({ avatarState, voiceStatus, persona }: AvatarCoreProp
                 <div className="relative flex items-center justify-center">
                     {/* Pulsing ring */}
                     <motion.div
-                        className="absolute rounded-full"
+                        className="absolute"
                         style={{
                             inset: -10,
+                            borderRadius: "50%",
                             border: `2.5px solid ${RING_COLOR[avatarState]}`,
                         }}
                         variants={speakingRingVariants}
@@ -44,7 +45,8 @@ export function AvatarCore({ avatarState, voiceStatus, persona }: AvatarCoreProp
                     />
 
                     {/* Avatar container — responsive size */}
-                    <div
+                    <motion.div
+                        layoutId="avatar"
                         style={{
                             width: AVATAR_SIZE,
                             height: AVATAR_SIZE,
@@ -58,24 +60,21 @@ export function AvatarCore({ avatarState, voiceStatus, persona }: AvatarCoreProp
                             position: "relative",
                         }}
                     >
-                        {/* Place /public/assets/avatar.png to show the MC character */}
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img
-                            src="/assets/avatar.png"
-                            alt={persona.name}
-                            style={{ width: "100%", height: "100%", objectFit: "cover" }}
-                            onError={(e) => {
-                                (e.target as HTMLImageElement).style.display = "none";
-                            }}
-                        />
-                        {/* Fallback emoji */}
-                        <span
-                            className="absolute select-none"
-                            style={{ fontSize: "clamp(3rem, 12vw, 4.5rem)" }}
-                        >
-                            {persona.emoji}
-                        </span>
-                    </div>
+                        {persona.image ? (
+                            <img
+                                src={persona.image}
+                                alt={persona.name}
+                                style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                            />
+                        ) : (
+                            <span
+                                className="select-none"
+                                style={{ fontSize: "clamp(3rem, 12vw, 4.5rem)" }}
+                            >
+                                {persona.emoji}
+                            </span>
+                        )}
+                    </motion.div>
                 </div>
 
                 {/* Right EQ bars */}

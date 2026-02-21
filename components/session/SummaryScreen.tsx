@@ -1,8 +1,11 @@
 "use client";
 
-import { motion } from "framer-motion";
+import { useState, useEffect } from "react";
+
+import { motion, AnimatePresence } from "framer-motion";
 import { useRouter } from "next/navigation";
 import { useAppContext } from "@/context/AppContext";
+import { ActionModal } from "@/components/shared/ActionModal";
 import type { MatchedUser, UserProfile } from "@/types";
 
 // ── Mini profile card ─────────────────────────────────────────────
@@ -43,15 +46,18 @@ export function SummaryScreen() {
     const { state, dispatch } = useAppContext();
     const { userProfile, matchedUser, sessionSummary } = state;
 
+    const [actionMessage, setActionMessage] = useState<string | null>(null);
+
     const handleFriendOnly = () => {
-        // TODO: 친구 제안 API 연동 (README 참고)
-        alert("친구 제안을 보냈습니다!");
-        resetAndGoHome();
+        setActionMessage("친구 제안을 보냈습니다!");
     };
 
     const handleAfter = () => {
-        // TODO: 애프터 신청 API 연동 (README 참고)
-        alert("애프터 신청을 보냈습니다!");
+        setActionMessage("애프터 신청을 보냈습니다!");
+    };
+
+    const confirmAction = () => {
+        setActionMessage(null);
         resetAndGoHome();
     };
 
@@ -173,6 +179,17 @@ export function SummaryScreen() {
                     </motion.button>
                 </div>
             </div>
+
+            {/* Action Popup */}
+            <AnimatePresence>
+                {actionMessage && (
+                    <ActionModal
+                        title={actionMessage}
+                        onConfirmText="확인"
+                        onConfirm={confirmAction}
+                    />
+                )}
+            </AnimatePresence>
         </div>
     );
 }

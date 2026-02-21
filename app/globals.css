@@ -21,13 +21,16 @@
   ::-webkit-scrollbar {
     width: 4px;
   }
+
   ::-webkit-scrollbar-track {
     background: transparent;
   }
+
   ::-webkit-scrollbar-thumb {
     background: rgba(0, 0, 0, 0.12);
     border-radius: 2px;
   }
+
   .dark ::-webkit-scrollbar-thumb {
     background: rgba(255, 255, 255, 0.12);
   }
@@ -53,4 +56,21 @@
   .text-balance {
     text-wrap: balance;
   }
+}
+
+@keyframes pulse-red {
+
+  0%,
+  100% {
+    border-color: #EF4444;
+  }
+
+  50% {
+    border-color: transparent;
+  }
+}
+
+.error-pulse {
+  border: 2px solid #EF4444 !important;
+  animation: pulse-red 0.9s ease-in-out infinite;
 }
