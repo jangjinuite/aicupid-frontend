@@ -87,6 +87,7 @@ export function useVoiceCapture(): UseVoiceCaptureReturn {
   const vadRef = useRef<MicVAD | null>(null);
   const destroyedRef = useRef(false);
   const isFetchingRef = useRef(false);
+  const activeSessionIdRef = useRef<string | null>(null);
 
   const { playResponse, close: closeAudio } = useAudioQueue();
 
@@ -109,7 +110,7 @@ export function useVoiceCapture(): UseVoiceCaptureReturn {
     setDebugLog((prev) => [entry, ...prev].slice(0, MAX_LOG));
   }, []);
 
-  // ── HTTP POST 통신 ──────────────────────────────────────────
+  // ── HTTP POST 통신 (상태 유지) ──────────────────────────────
   const sendAudioData = async (audioBlob: Blob) => {
     if (isFetchingRef.current) return;
     isFetchingRef.current = true;
@@ -120,7 +121,17 @@ export function useVoiceCapture(): UseVoiceCaptureReturn {
       const formData = new FormData();
       formData.append("file", audioBlob, "audio.wav");
 
-      const res = await fetch(`${BACKEND_URL}/api/audio-to-text`, {
+      let endpoint = "";
+      if (activeSessionIdRef.current) {
+        endpoint = `${BACKEND_URL}/api/continue-conversation`;
+        formData.append("session_id", activeSessionIdRef.current);
+      } else {
+        endpoint = `${BACKEND_URL}/api/first-conversation`;
+        formData.append("user_id_1", "0");
+        formData.append("user_id_2", "0");
+      }
+
+      const res = await fetch(endpoint, {
         method: "POST",
         body: formData,
       });
@@ -131,12 +142,18 @@ export function useVoiceCapture(): UseVoiceCaptureReturn {
 
       const data = await res.json();
 
+      const newSessionId = data.session_id;
+      if (newSessionId && !activeSessionIdRef.current) {
+        activeSessionIdRef.current = newSessionId;
+        pushLog(`✓ 세션 발급됨: ${newSessionId}`, "green");
+      }
+
       const reply = data.reply;
       const audioB64 = data.audio;
       const mimeType = data.mime_type || "audio/wav";
 
       if (reply) {
-        pushLog(`◀ AI 텍스트: ${reply}`, "green");
+        pushLog(`◀ AI 답변: ${reply}`, "green");
       }
 
       if (audioB64) {
@@ -236,8 +253,9 @@ export function useVoiceCapture(): UseVoiceCaptureReturn {
     const vad = vadRef.current;
     if (vad) void vad.pause();
     closeAudio();
+    activeSessionIdRef.current = null;
     setStatus("idle");
-    pushLog("■ 세션 중지", "yellow");
+    pushLog("■ 세션 중지 및 초기화", "yellow");
   }, [closeAudio, pushLog]);
 
   const dismissEvent = useCallback(() => setGameEvent(null), []);
