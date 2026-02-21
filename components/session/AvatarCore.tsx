@@ -60,9 +60,9 @@ export function AvatarCore({ avatarState, voiceStatus, persona }: AvatarCoreProp
                             position: "relative",
                         }}
                     >
-                        {persona.image ? (
+                        {persona.images ? (
                             <img
-                                src={persona.image}
+                                src={persona.images[avatarState === "idle" ? "listening" : avatarState]}
                                 alt={persona.name}
                                 style={{ width: "100%", height: "100%", objectFit: "cover" }}
                             />

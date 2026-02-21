@@ -10,7 +10,6 @@ interface BalanceGamePopupProps {
     question: string;
     choices: [string, string];
     voiceStatus: VoiceStatus;
-    wsConnected: boolean;
     onClose: () => void;
 }
 
@@ -18,7 +17,6 @@ export function BalanceGamePopup({
     question,
     choices,
     voiceStatus,
-    wsConnected,
     onClose,
 }: BalanceGamePopupProps) {
     return (
@@ -79,7 +77,7 @@ export function BalanceGamePopup({
 
             {/* Voice indicator */}
             <div className="px-6 pb-6">
-                <WaveformIndicator status={voiceStatus} wsConnected={wsConnected} />
+                <WaveformIndicator status={voiceStatus} />
             </div>
         </motion.div>
     );

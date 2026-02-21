@@ -27,7 +27,11 @@ export interface Persona {
     accentColor: string;
     avatarGradient: string;
     emoji: string;
-    image?: string;
+    images: {
+        listening: string;
+        thinking: string;
+        speaking: string;
+    };
 }
 
 // Game event (퀴즈 / 심리테스트 / 밸런스 게임) — 스펙 확정 후 상세 타입 추가

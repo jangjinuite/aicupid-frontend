@@ -5,7 +5,6 @@ import type { VoiceStatus } from "@/hooks/useVoiceCapture";
 
 interface VoiceBarProps {
     status: VoiceStatus;
-    wsConnected: boolean;
 }
 
 const STATUS_CONFIG = {
@@ -26,7 +25,7 @@ const MINI_PATTERNS = [
     [0.25, 0.9, 0.35, 0.7, 0.1],
 ];
 
-export function WaveformIndicator({ status, wsConnected }: VoiceBarProps) {
+export function WaveformIndicator({ status }: VoiceBarProps) {
     const cfg = STATUS_CONFIG[status];
     const isActive = status === "speaking" || status === "listening";
 
@@ -74,15 +73,6 @@ export function WaveformIndicator({ status, wsConnected }: VoiceBarProps) {
                     />
                 ))}
             </div>
-
-            {/* WS indicator */}
-            <div
-                className="w-2 h-2 rounded-full flex-shrink-0"
-                style={{
-                    backgroundColor: wsConnected ? "#86E3E3" : "#9CA3AF",
-                    opacity: wsConnected ? 1 : 0.4,
-                }}
-            />
         </div>
     );
 }

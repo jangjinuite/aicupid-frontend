@@ -14,7 +14,6 @@ interface PsychTestPopupProps {
     /** 참가자 이름 목록 (없으면 "참가자 1", "참가자 2" 사용) */
     participants?: string[];
     voiceStatus: VoiceStatus;
-    wsConnected: boolean;
     onClose: () => void;
 }
 
@@ -23,7 +22,6 @@ export function PsychTestPopup({
     participantCount = 2,
     participants,
     voiceStatus,
-    wsConnected,
     onClose,
 }: PsychTestPopupProps) {
     const [currentIdx, setCurrentIdx] = useState(0);
@@ -106,7 +104,7 @@ export function PsychTestPopup({
 
             {/* Voice indicator */}
             <div className="px-6 py-3">
-                <WaveformIndicator status={voiceStatus} wsConnected={wsConnected} />
+                <WaveformIndicator status={voiceStatus} />
             </div>
 
             {/* Next / Done button */}

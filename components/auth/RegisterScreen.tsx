@@ -214,6 +214,7 @@ export function RegisterScreen() {
                                 password={password} setPassword={setPassword}
                                 passwordConfirm={passwordConfirm} setPasswordConfirm={setPasswordConfirm}
                                 pwMatch={pwMatch}
+                                showErrors={showErrors0}
                             />
                         )}
                         {step === 1 && (
@@ -301,9 +302,10 @@ interface Step0Props {
     password: string; setPassword: (v: string) => void;
     passwordConfirm: string; setPasswordConfirm: (v: string) => void;
     pwMatch: boolean;
+    showErrors: boolean;
 }
 
-function Step0Account({ userId, setUserId, password, setPassword, passwordConfirm, setPasswordConfirm, pwMatch }: Step0Props) {
+function Step0Account({ userId, setUserId, password, setPassword, passwordConfirm, setPasswordConfirm, pwMatch, showErrors }: Step0Props) {
     const inputClass = "w-full px-4 py-4 rounded-2xl text-base font-semibold outline-none bg-[#F6FAFA] dark:bg-[#2C2C2E] text-[#1A1A1A] dark:text-[#F0F0F0] placeholder:text-[#1A1A1A]/30 dark:placeholder:text-white/25";
 
     return (
@@ -316,46 +318,61 @@ function Step0Account({ userId, setUserId, password, setPassword, passwordConfir
             </div>
 
             <div className="flex flex-col gap-2">
-                <label className="text-sm font-bold text-[#1A1A1A] dark:text-[#F0F0F0]">아이디</label>
+                <label className="text-sm font-bold text-[#1A1A1A] dark:text-[#F0F0F0]">
+                    아이디
+                    {showErrors && userId.trim().length < 2 && (
+                        <span className="ml-2 text-xs font-semibold" style={{ color: "#EF4444" }}>2자 이상 입력해주세요</span>
+                    )}
+                </label>
                 <input
                     type="text"
                     value={userId}
                     onChange={e => setUserId(e.target.value)}
                     placeholder="아이디 (2자 이상)"
                     autoComplete="username"
-                    className={inputClass}
-                    style={{ border: "2px solid", borderColor: userId.length >= 2 ? "#86E3E3" : "transparent" }}
+                    className={`${inputClass} ${showErrors && userId.trim().length < 2 ? "error-pulse" : ""}`}
+                    style={{ border: "2px solid", borderColor: showErrors && userId.trim().length < 2 ? "#EF4444" : userId.length >= 2 ? "#86E3E3" : "transparent" }}
                 />
             </div>
 
             <div className="flex flex-col gap-2">
-                <label className="text-sm font-bold text-[#1A1A1A] dark:text-[#F0F0F0]">비밀번호</label>
+                <label className="text-sm font-bold text-[#1A1A1A] dark:text-[#F0F0F0]">
+                    비밀번호
+                    {showErrors && password.length < 4 && (
+                        <span className="ml-2 text-xs font-semibold" style={{ color: "#EF4444" }}>4자 이상 입력해주세요</span>
+                    )}
+                </label>
                 <input
                     type="password"
                     value={password}
                     onChange={e => setPassword(e.target.value)}
                     placeholder="비밀번호 (4자 이상)"
                     autoComplete="new-password"
-                    className={inputClass}
-                    style={{ border: "2px solid", borderColor: password.length >= 4 ? "#86E3E3" : "transparent" }}
+                    className={`${inputClass} ${showErrors && password.length < 4 ? "error-pulse" : ""}`}
+                    style={{ border: "2px solid", borderColor: showErrors && password.length < 4 ? "#EF4444" : password.length >= 4 ? "#86E3E3" : "transparent" }}
                 />
             </div>
 
             <div className="flex flex-col gap-2">
-                <label className="text-sm font-bold text-[#1A1A1A] dark:text-[#F0F0F0]">비밀번호 확인</label>
+                <label className="text-sm font-bold text-[#1A1A1A] dark:text-[#F0F0F0]">
+                    비밀번호 확인
+                    {showErrors && password !== passwordConfirm && (
+                        <span className="ml-2 text-xs font-semibold" style={{ color: "#EF4444" }}>비밀번호가 일치하지 않습니다</span>
+                    )}
+                </label>
                 <input
                     type="password"
                     value={passwordConfirm}
                     onChange={e => setPasswordConfirm(e.target.value)}
                     placeholder="비밀번호를 다시 입력해주세요"
                     autoComplete="new-password"
-                    className={inputClass}
+                    className={`${inputClass} ${showErrors && password !== passwordConfirm ? "error-pulse" : ""}`}
                     style={{
                         border: "2px solid",
-                        borderColor: !pwMatch ? "#EF4444" : passwordConfirm && pwMatch ? "#86E3E3" : "transparent",
+                        borderColor: (!pwMatch || (showErrors && password !== passwordConfirm)) ? "#EF4444" : passwordConfirm && pwMatch ? "#86E3E3" : "transparent",
                     }}
                 />
-                {!pwMatch && (
+                {!pwMatch && !showErrors && (
                     <p className="text-xs font-semibold" style={{ color: "#EF4444" }}>
                         비밀번호가 일치하지 않습니다
                     </p>

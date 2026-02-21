@@ -62,20 +62,28 @@ export const PERSONAS: Persona[] = [
     {
         id: "daguri",
         name: "다구리",
-        description: "귀여운 햄스터 외모 속에 숨겨진 뼈 때리는 팩트폭격기",
+        description: "귀여운 외모 속에 숨겨진 뼈 때리는 팩트폭격기 딱따구리",
         accentColor: "rgba(255,160,122,0.70)",
         avatarGradient: "linear-gradient(135deg, #FFEFD5, #FFA07A)",
-        emoji: "🐹",
-        image: "/assets/daguri.jpeg",
+        emoji: "🌳",
+        images: {
+            listening: "/assets/daguri_stand.png",
+            thinking: "/assets/daguri.jpeg",
+            speaking: "/assets/daguri_happy.jpeg",
+        },
     },
     {
         id: "rudumi",
         name: "루두미",
-        description: "차분하고 지적인 분위기를 풍기는 다정한 여우 마스터",
+        description: "차분하고 지적인 분위기를 풍기는 과묵하지만 다정한 두루미",
         accentColor: "rgba(135,206,250,0.65)",
         avatarGradient: "linear-gradient(135deg, #F0F8FF, #87CEFA)",
-        emoji: "🦊",
-        image: "/assets/rudumi.png",
+        emoji: "🍾",
+        images: {
+            listening: "/assets/rudumi_stand.jpeg",
+            thinking: "/assets/rudumi.png",
+            speaking: "/assets/rudumi_happy.jpeg",
+        },
     },
 ];
 

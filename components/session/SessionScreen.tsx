@@ -47,7 +47,7 @@ export function SessionScreen() {
     const router = useRouter();
     const { state, dispatch } = useAppContext();
     const {
-        status, wsStatus, isWaiting, avatarState,
+        status, isWaiting, avatarState,
         loading, error, gameEvent,
         start, stop, forceCommit, dismissEvent,
     } = useVoiceCapture();
@@ -77,7 +77,6 @@ export function SessionScreen() {
 
     const persona = PERSONAS.find((p) => p.id === state.sessionSettings.selectedPersonaId) ?? PERSONAS[0];
     const isActive = status !== "idle";
-    const wsConnected = wsStatus === "connected";
     const pill = STATUS_PILL[status] ?? STATUS_PILL.idle;
 
     const handleBack = () => {
@@ -123,24 +122,6 @@ export function SessionScreen() {
                 <span className="font-black text-base text-[#1A1A1A] dark:text-[#F0F0F0] tracking-tight">
                     AI CUPID
                 </span>
-
-                {/* WS status */}
-                <div className="flex items-center gap-1.5">
-                    <div
-                        className="w-2 h-2 rounded-full"
-                        style={{
-                            backgroundColor:
-                                wsStatus === "connected" ? "#86E3E3"
-                                    : wsStatus === "connecting" ? "#E6D08E"
-                                        : wsStatus === "error" ? "#EF4444"
-                                            : "#9CA3AF",
-                            boxShadow: wsConnected ? "0 0 6px #86E3E3" : "none",
-                        }}
-                    />
-                    <span className="text-xs text-[#1A1A1A]/40 dark:text-white/30 font-mono">
-                        {wsStatus}
-                    </span>
-                </div>
             </div>
 
             {/* ── Avatar area ──────────────────────────────────── */}
@@ -208,7 +189,7 @@ export function SessionScreen() {
                 </motion.button>
 
                 {/* Always-visible voice bar */}
-                <WaveformIndicator status={status} wsConnected={wsConnected} />
+                <WaveformIndicator status={status} />
             </div>
 
             {/* ── Game event popups ─────────────────────────────── */}
@@ -231,7 +212,6 @@ export function SessionScreen() {
                             <PsychTestPopup
                                 question={activeEvent.question}
                                 voiceStatus={status}
-                                wsConnected={wsConnected}
                                 onClose={dismissActive}
                             />
                         )}
@@ -241,7 +221,6 @@ export function SessionScreen() {
                                 question={activeEvent.question}
                                 choices={[activeEvent.choices[0] ?? "A", activeEvent.choices[1] ?? "B"]}
                                 voiceStatus={status}
-                                wsConnected={wsConnected}
                                 onClose={dismissActive}
                             />
                         )}
@@ -251,7 +230,6 @@ export function SessionScreen() {
                                 question={activeEvent.question}
                                 choices={activeEvent.choices}
                                 voiceStatus={status}
-                                wsConnected={wsConnected}
                                 onClose={dismissActive}
                             />
                         )}

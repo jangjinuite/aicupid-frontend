@@ -57,9 +57,9 @@ export function PersonaCarousel({ personas, selectedId, onSelect, onStart }: Per
                                 className="w-48 h-48 flex items-center justify-center border-[3px] border-primary overflow-hidden"
                                 style={{ background: "#F0FAFA", borderRadius: "50%" }}
                             >
-                                {persona.image ? (
+                                {persona.images ? (
                                     <img
-                                        src={persona.image}
+                                        src={persona.images.listening}
                                         alt={persona.name}
                                         className="w-full h-full object-cover"
                                     />

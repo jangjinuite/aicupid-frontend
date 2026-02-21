@@ -10,7 +10,6 @@ interface QuizPopupProps {
     question: string;
     choices: string[];
     voiceStatus: VoiceStatus;
-    wsConnected: boolean;
     onClose: () => void;
 }
 
@@ -25,7 +24,6 @@ export function QuizPopup({
     question,
     choices,
     voiceStatus,
-    wsConnected,
     onClose,
 }: QuizPopupProps) {
     const displayChoices = choices.slice(0, 4);
@@ -91,7 +89,7 @@ export function QuizPopup({
 
             {/* Voice indicator */}
             <div className="px-6 pb-6">
-                <WaveformIndicator status={voiceStatus} wsConnected={wsConnected} />
+                <WaveformIndicator status={voiceStatus} />
             </div>
         </motion.div>
     );
