@@ -35,6 +35,8 @@ export interface UseVoiceCaptureReturn {
   submitPsychTestResult: (blob1: Blob, blob2: Blob) => Promise<any>;
   triggerQuiz: () => Promise<void>;
   submitQuizResult: (blob: Blob, questionId: string) => Promise<any>;
+  triggerBalanceGame: () => Promise<void>;
+  submitBalanceGameResult: (blobs: [Blob, Blob, Blob], questionTexts: [string, string, string]) => Promise<any>;
 }
 
 // ── 유틸 ─────────────────────────────────────────────────────
@@ -417,6 +419,108 @@ export function useVoiceCapture(): UseVoiceCaptureReturn {
     }
   }, [playResponse, pushLog]);
 
+  // ── 밸런스 게임 API ────────────────────────────────────────────────
+  const triggerBalanceGame = useCallback(async () => {
+    if (isFetchingRef.current) return;
+    if (!activeSessionIdRef.current) {
+      pushLog("✗ 진행 중인 세션이 없어 밸런스 게임을 시작할 수 없어요", "red");
+      return;
+    }
+
+    isFetchingRef.current = true;
+    setStatus("waiting");
+    pushLog("▶ 밸런스 게임 문제 요청 중...", "blue");
+
+    try {
+      const formData = new FormData();
+      formData.append("session_id", activeSessionIdRef.current);
+
+      const res = await fetch(`${BACKEND_URL}/api/balance-game-questions`, {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!res.ok) throw new Error(`서버 에러 (${res.status})`);
+      const data = await res.json();
+
+      // Expected: { questions: [{ text, options: [A, B], audio, mime_type }, x3] }
+      const questions = data.questions as { text: string; options: string[]; audio?: string; mime_type?: string }[];
+
+      setGameEvent({
+        type: "balance",
+        question: questions[0].text,
+        choices: questions[0].options,
+        questions,
+      });
+
+      if (questions[0].audio) {
+        pushLog(`◀ 밸런스 게임 첫 번째 문제 오디오 수신`, "blue");
+        setStatus("ai_speaking");
+        if (vadRef.current) void vadRef.current.pause();
+        await playResponse(questions[0].audio, questions[0].mime_type || "audio/wav", () => {
+          isFetchingRef.current = false;
+          setStatus((prev) => (prev === "ai_speaking" || prev === "waiting") ? "listening" : prev);
+          if (vadRef.current && !destroyedRef.current) void vadRef.current.start();
+        });
+      } else {
+        isFetchingRef.current = false;
+        setStatus((prev) => (prev === "ai_speaking" || prev === "waiting") ? "listening" : prev);
+      }
+    } catch (err) {
+      pushLog(`✗ 밸런스 게임 호출 오류: ${err}`, "red");
+      isFetchingRef.current = false;
+      setStatus((prev) => (prev === "ai_speaking" || prev === "waiting") ? "listening" : prev);
+    }
+  }, [playResponse, pushLog]);
+
+  const submitBalanceGameResult = useCallback(async (blobs: [Blob, Blob, Blob], questionTexts: [string, string, string]) => {
+    if (!activeSessionIdRef.current) throw new Error("No active session");
+
+    isFetchingRef.current = true;
+    setStatus("waiting");
+    pushLog(`▶ 밸런스 게임 결과 분석 중...`, "blue");
+
+    try {
+      const formData = new FormData();
+      formData.append("session_id", activeSessionIdRef.current);
+      formData.append("question_text_1", questionTexts[0]);
+      formData.append("question_text_2", questionTexts[1]);
+      formData.append("question_text_3", questionTexts[2]);
+      const ext = (b: Blob) => b.type.includes("webm") ? "webm" : "wav";
+      formData.append("file_1", blobs[0], `answer1.${ext(blobs[0])}`);
+      formData.append("file_2", blobs[1], `answer2.${ext(blobs[1])}`);
+      formData.append("file_3", blobs[2], `answer3.${ext(blobs[2])}`);
+
+      const res = await fetch(`${BACKEND_URL}/api/balance-game-result`, {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!res.ok) throw new Error(`서버 에러 (${res.status})`);
+      const data = await res.json();
+
+      if (data.audio) {
+        setStatus("ai_speaking");
+        if (vadRef.current) void vadRef.current.pause();
+        await playResponse(data.audio, data.mime_type || "audio/wav", () => {
+          isFetchingRef.current = false;
+          setStatus((prev) => (prev === "ai_speaking" || prev === "waiting") ? "listening" : prev);
+          if (vadRef.current && !destroyedRef.current) void vadRef.current.start();
+        });
+      } else {
+        isFetchingRef.current = false;
+        setStatus((prev) => (prev === "ai_speaking" || prev === "waiting") ? "listening" : prev);
+      }
+
+      return data;
+    } catch (err) {
+      pushLog(`✗ 밸런스 게임 결과 분석 오류: ${err}`, "red");
+      isFetchingRef.current = false;
+      setStatus((prev) => (prev === "ai_speaking" || prev === "waiting") ? "listening" : prev);
+      throw err;
+    }
+  }, [playResponse, pushLog]);
+
   // ── MediaRecorder 제어 로직 ──────────────────────────────────────
   const startMediaRecorder = async () => {
     try {
@@ -611,6 +715,7 @@ export function useVoiceCapture(): UseVoiceCaptureReturn {
     start, stop, forceCommit, dismissEvent,
     registerSpeechHandler, unregisterSpeechHandler,
     triggerPsychTest, submitPsychTestResult,
-    triggerQuiz, submitQuizResult
+    triggerQuiz, submitQuizResult,
+    triggerBalanceGame, submitBalanceGameResult,
   };
 }

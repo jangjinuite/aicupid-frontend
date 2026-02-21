@@ -33,8 +33,13 @@ const DEV_EVENTS: Record<string, GameEvent> = {
     },
     "2": {
         type: "balance",
-        question: "평생 한 종류의 음식만 먹어야 한다면? 단짠(달고 짠 음식) vs 매콤(매운 음식)",
+        question: "평생 한 종류의 음식만 먹어야 한다면? 단짠 vs 매콤",
         choices: ["단짠", "매콤"],
+        questions: [
+            { text: "평생 한 종류의 음식만 먹어야 한다면? 단짠(달고 짠 음식) vs 매콤(매운 음식)", options: ["단짠", "매콤"] },
+            { text: "여행 스타일은? 혼자 여행 vs 함께 여행", options: ["혼자 여행", "함께 여행"] },
+            { text: "주말 저녁은? 영화관 데이트 vs 넷플릭스 집콕", options: ["영화관", "넷플릭스"] },
+        ],
     },
     "3": {
         type: "quiz",
@@ -52,7 +57,8 @@ export function SessionScreen() {
         start, stop, forceCommit, dismissEvent,
         registerSpeechHandler, unregisterSpeechHandler,
         triggerPsychTest, submitPsychTestResult,
-        triggerQuiz, submitQuizResult
+        triggerQuiz, submitQuizResult,
+        triggerBalanceGame, submitBalanceGameResult,
     } = useVoiceCapture();
 
     const [devEvent, setDevEvent] = useState<GameEvent | null>(null);
@@ -70,6 +76,9 @@ export function SessionScreen() {
         const handler = (e: KeyboardEvent) => {
             if (e.key === "1") {
                 if (status !== "idle" && status !== "waiting") void triggerPsychTest();
+            } else if (e.key === "2") {
+                if (status !== "idle" && status !== "waiting") void triggerBalanceGame();
+                else setDevEvent(DEV_EVENTS["2"]);
             } else if (e.key === "3") {
                 if (status !== "idle" && status !== "waiting") void triggerQuiz();
             } else {
@@ -79,7 +88,7 @@ export function SessionScreen() {
         };
         window.addEventListener("keydown", handler);
         return () => window.removeEventListener("keydown", handler);
-    }, [triggerPsychTest, triggerQuiz, status]);
+    }, [triggerPsychTest, triggerBalanceGame, triggerQuiz, status]);
 
     const activeEvent = gameEvent ?? devEvent;
     const dismissActive = gameEvent ? dismissEvent : () => setDevEvent(null);
@@ -233,16 +242,18 @@ export function SessionScreen() {
                             />
                         )}
 
-                        {activeEvent.type === "balance" && (
+                        {activeEvent.type === "balance" && activeEvent.questions && (
                             <BalanceGamePopup
-                                question={activeEvent.question}
-                                choices={[activeEvent.choices[0] ?? "A", activeEvent.choices[1] ?? "B"]}
+                                questions={activeEvent.questions}
                                 voiceStatus={status}
                                 onClose={dismissActive}
                                 persona={persona}
                                 avatarState={avatarState}
                                 forceCommit={forceCommit}
                                 isWaiting={isWaiting}
+                                registerSpeechHandler={registerSpeechHandler}
+                                unregisterSpeechHandler={unregisterSpeechHandler}
+                                submitBalanceGameResult={submitBalanceGameResult}
                             />
                         )}
 

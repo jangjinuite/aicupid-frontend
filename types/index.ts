@@ -37,9 +37,16 @@ export interface Persona {
 // Game event (퀴즈 / 심리테스트 / 밸런스 게임) — 스펙 확정 후 상세 타입 추가
 export interface GameEvent {
     type: "quiz" | "psych" | "balance";
-    questionId?: string;
+    questionId?: string; // for quiz
     question: string;
     choices: string[];
+    // for balance game sequence
+    questions?: {
+        text: string;
+        options: string[];
+        audio?: string;
+        mime_type?: string;
+    }[];
 }
 
 // Session settings
