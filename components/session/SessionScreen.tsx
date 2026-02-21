@@ -76,6 +76,13 @@ export function SessionScreen() {
         router.push("/");
     };
 
+    const handleStop = () => {
+        stop();
+        // TODO: 실제 구현 시 AI 요약 생성 후 SET_SESSION_SUMMARY dispatch (README 참고)
+        dispatch({ type: "SET_SESSION_SUMMARY", payload: "" });
+        router.push("/summary");
+    };
+
     return (
         <div
             className="relative flex flex-col bg-white dark:bg-dark-bg overflow-hidden mx-auto w-full"
@@ -175,7 +182,7 @@ export function SessionScreen() {
             >
                 {/* Start / Stop */}
                 <motion.button
-                    onClick={isActive ? stop : start}
+                    onClick={isActive ? handleStop : start}
                     disabled={loading || !!error}
                     className="w-full py-4 rounded-2xl font-black text-base disabled:opacity-40 disabled:cursor-not-allowed"
                     style={{

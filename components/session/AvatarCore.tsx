@@ -58,10 +58,10 @@ export function AvatarCore({ avatarState, voiceStatus, persona }: AvatarCoreProp
                             position: "relative",
                         }}
                     >
-                        {/* Place /public/avatar.png to show the MC character */}
+                        {/* Place /public/assets/avatar.png to show the MC character */}
                         {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img
-                            src="/avatar.png"
+                            src="/assets/avatar.png"
                             alt={persona.name}
                             style={{ width: "100%", height: "100%", objectFit: "cover" }}
                             onError={(e) => {

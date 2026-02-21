@@ -7,12 +7,15 @@ import {
     type ReactNode,
     type Dispatch,
 } from "react";
-import type { AppPhase, AvatarState, SessionSettings } from "@/types";
+import type { AppPhase, AvatarState, SessionSettings, UserProfile, MatchedUser } from "@/types";
 import { PERSONAS } from "@/lib/mockData";
 
 interface AppState {
     phase: AppPhase;
     sessionSettings: SessionSettings;
+    userProfile: UserProfile | null;
+    matchedUser: MatchedUser | null;
+    sessionSummary: string;
 }
 
 type AppAction =
@@ -20,7 +23,11 @@ type AppAction =
     | { type: "SESSION_READY" }
     | { type: "GO_LANDING" }
     | { type: "SET_PERSONA"; payload: string }
-    | { type: "SET_AVATAR_STATE"; payload: AvatarState };
+    | { type: "SET_AVATAR_STATE"; payload: AvatarState }
+    | { type: "SET_USER_PROFILE"; payload: UserProfile }
+    | { type: "SET_MATCHED_USER"; payload: MatchedUser }
+    | { type: "SET_SESSION_SUMMARY"; payload: string }
+    | { type: "LOGOUT" };
 
 const initialState: AppState = {
     phase: "landing",
@@ -28,6 +35,9 @@ const initialState: AppState = {
         selectedPersonaId: PERSONAS[0].id,
         avatarState: "idle",
     },
+    userProfile: null,
+    matchedUser: null,
+    sessionSummary: "",
 };
 
 function appReducer(state: AppState, action: AppAction): AppState {
@@ -58,6 +68,14 @@ function appReducer(state: AppState, action: AppAction): AppState {
                     avatarState: action.payload,
                 },
             };
+        case "SET_USER_PROFILE":
+            return { ...state, userProfile: action.payload };
+        case "SET_MATCHED_USER":
+            return { ...state, matchedUser: action.payload };
+        case "SET_SESSION_SUMMARY":
+            return { ...state, sessionSummary: action.payload };
+        case "LOGOUT":
+            return { ...initialState };
         default:
             return state;
     }

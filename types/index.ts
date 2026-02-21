@@ -1,6 +1,18 @@
 // App-level phase machine
 export type AppPhase = "landing" | "transitioning" | "session";
 
+// User profile collected at registration
+export interface UserProfile {
+    userId: string;
+    name: string;
+    gender: "male" | "female";
+    age: number;
+    interests: string[];
+    mbti: string;
+    bio: string;
+    profileImage?: string; // base64 data URL
+}
+
 // Avatar animation state machine
 export type AvatarState = "idle" | "listening" | "speaking" | "thinking";
 
@@ -28,4 +40,16 @@ export interface GameEvent {
 export interface SessionSettings {
     selectedPersonaId: string;
     avatarState: AvatarState;
+}
+
+// Matched partner (소개팅 상대)
+export interface MatchedUser {
+    userId: string;
+    name: string;
+    age: number;
+    gender: "male" | "female";
+    mbti: string;
+    interests: string[];
+    bio: string;
+    profileImage?: string;
 }
