@@ -3,6 +3,7 @@
 import { useState, useCallback, useRef, useEffect } from "react";
 import { MicVAD } from "@ricky0123/vad-web";
 import { useAudioQueue } from "@/hooks/useAudioQueue";
+import { useAppContext } from "@/context/AppContext";
 import type { AvatarState, GameEvent } from "@/types";
 
 const BACKEND_URL =
@@ -28,6 +29,10 @@ export interface UseVoiceCaptureReturn {
   stop: () => void;
   forceCommit: () => void;
   dismissEvent: () => void;
+  registerSpeechHandler: (handler: (blob: Blob) => void) => void;
+  unregisterSpeechHandler: () => void;
+  triggerPsychTest: () => Promise<void>;
+  submitPsychTestResult: (blob1: Blob, blob2: Blob) => Promise<any>;
 }
 
 // ── 유틸 ─────────────────────────────────────────────────────
@@ -77,6 +82,7 @@ const MAX_LOG = 40;
 // ── Hook ─────────────────────────────────────────────────────
 
 export function useVoiceCapture(): UseVoiceCaptureReturn {
+  const { state: appState } = useAppContext();
   const [status, setStatus] = useState<VoiceStatus>("idle");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -88,6 +94,7 @@ export function useVoiceCapture(): UseVoiceCaptureReturn {
   const destroyedRef = useRef(false);
   const isFetchingRef = useRef(false);
   const activeSessionIdRef = useRef<string | null>(null);
+  const customSpeechHandlerRef = useRef<((blob: Blob) => void) | null>(null);
 
   // MediaRecorder refs (for partial audio capture on forceCommit)
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -134,8 +141,8 @@ export function useVoiceCapture(): UseVoiceCaptureReturn {
         formData.append("session_id", activeSessionIdRef.current);
       } else {
         endpoint = `${BACKEND_URL}/api/first-conversation`;
-        formData.append("user_id_1", "0");
-        formData.append("user_id_2", "0");
+        formData.append("user_id_1", appState.userProfile?.userId || "0");
+        formData.append("user_id_2", appState.matchedUser?.userId || "0");
       }
 
       const res = await fetch(endpoint, {
@@ -179,6 +186,98 @@ export function useVoiceCapture(): UseVoiceCaptureReturn {
       setStatus((prev) => (prev === "ai_speaking" || prev === "waiting") ? "listening" : prev);
     }
   };
+
+  const registerSpeechHandler = useCallback((handler: (blob: Blob) => void) => {
+    customSpeechHandlerRef.current = handler;
+  }, []);
+
+  const unregisterSpeechHandler = useCallback(() => {
+    customSpeechHandlerRef.current = null;
+  }, []);
+
+  const triggerPsychTest = useCallback(async () => {
+    if (isFetchingRef.current) return;
+    if (!activeSessionIdRef.current) {
+      pushLog("✗ 진행 중인 세션이 없어 심리테스트를 시작할 수 없어요", "red");
+      return;
+    }
+
+    isFetchingRef.current = true;
+    setStatus("waiting");
+    pushLog("▶ 심리테스트 문제 요청 중...", "blue");
+
+    try {
+      const formData = new FormData();
+      const sampleRate = 16000;
+      const silentFloat32 = new Float32Array(sampleRate * 0.5);
+      const wavBlob = encodeWAV(silentFloat32, sampleRate);
+      formData.append("file", wavBlob, "audio.wav");
+      formData.append("session_id", activeSessionIdRef.current);
+
+      const res = await fetch(`${BACKEND_URL}/api/psych-test`, {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!res.ok) throw new Error(`서버 에러 (${res.status})`);
+      const data = await res.json();
+
+      const reply = data.reply || data.response || "심리테스트 질문입니다.";
+      const audioB64 = data.audio;
+      const mimeType = data.mime_type || "audio/wav";
+
+      setGameEvent({ type: "psych", question: reply, choices: [] });
+
+      if (audioB64) {
+        pushLog(`◀ 오디오 수신 (${Math.round((audioB64.length * 3) / 4 / 1024)}KB)`, "blue");
+        setStatus("ai_speaking");
+        await playResponse(audioB64, mimeType);
+      }
+    } catch (err) {
+      pushLog(`✗ 심리테스트 호출 오류: ${err}`, "red");
+    } finally {
+      isFetchingRef.current = false;
+      setStatus((prev) => (prev === "ai_speaking" || prev === "waiting") ? "listening" : prev);
+    }
+  }, [playResponse, pushLog]);
+
+  const submitPsychTestResult = useCallback(async (blob1: Blob, blob2: Blob) => {
+    if (!activeSessionIdRef.current) throw new Error("No active session");
+
+    isFetchingRef.current = true;
+    setStatus("waiting");
+    pushLog(`▶ 심리테스트 결과 분석 중...`, "blue");
+
+    try {
+      const formData = new FormData();
+      formData.append("session_id", activeSessionIdRef.current);
+      const ext1 = blob1.type.includes("webm") ? "webm" : "wav";
+      const ext2 = blob2.type.includes("webm") ? "webm" : "wav";
+      formData.append("file_1", blob1, `audio1.${ext1}`);
+      formData.append("file_2", blob2, `audio2.${ext2}`);
+
+      const res = await fetch(`${BACKEND_URL}/api/psych-test-result`, {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!res.ok) throw new Error(`서버 에러 (${res.status})`);
+      const data = await res.json();
+
+      if (data.audio) {
+        setStatus("ai_speaking");
+        await playResponse(data.audio, data.mime_type || "audio/wav");
+      }
+
+      return data;
+    } catch (err) {
+      pushLog(`✗ 결과 분석 오류: ${err}`, "red");
+      throw err;
+    } finally {
+      isFetchingRef.current = false;
+      setStatus((prev) => (prev === "ai_speaking" || prev === "waiting") ? "listening" : prev);
+    }
+  }, [playResponse, pushLog]);
 
   // ── MediaRecorder 제어 로직 ──────────────────────────────────────
   const startMediaRecorder = async () => {
@@ -253,7 +352,11 @@ export function useVoiceCapture(): UseVoiceCaptureReturn {
         // 브라우저 포맷(WebM)이 있으면 우선 사용하고, 없으면 VAD의 16kHz WAV 사용
         const finalBlob = recordedWebm && recordedWebm.size > 0 ? recordedWebm : vadWavBlob;
 
-        void sendAudioData(finalBlob);
+        if (customSpeechHandlerRef.current) {
+          customSpeechHandlerRef.current(finalBlob);
+        } else {
+          void sendAudioData(finalBlob);
+        }
       },
 
       onVADMisfire() {
@@ -316,7 +419,11 @@ export function useVoiceCapture(): UseVoiceCaptureReturn {
       pushLog("빈 오디오(fallback) 생성됨", "yellow");
     }
 
-    await sendAudioData(recordedBlob);
+    if (customSpeechHandlerRef.current) {
+      customSpeechHandlerRef.current(recordedBlob);
+    } else {
+      await sendAudioData(recordedBlob);
+    }
 
     // 처리가 끝나고 idle/listening 상태로 돌아갈때 VAD 재기동
     if (vadRef.current && !destroyedRef.current) {
@@ -356,5 +463,7 @@ export function useVoiceCapture(): UseVoiceCaptureReturn {
     status, isWaiting, avatarState,
     loading, error, gameEvent, debugLog,
     start, stop, forceCommit, dismissEvent,
+    registerSpeechHandler, unregisterSpeechHandler,
+    triggerPsychTest, submitPsychTestResult
   };
 }

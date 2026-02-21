@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { X } from "lucide-react";
 import { WaveformIndicator } from "@/components/session/WaveformIndicator";
@@ -15,6 +15,9 @@ interface PsychTestPopupProps {
     participants?: string[];
     voiceStatus: VoiceStatus;
     onClose: () => void;
+    registerSpeechHandler?: (handler: (blob: Blob) => void) => void;
+    unregisterSpeechHandler?: () => void;
+    submitPsychTestResult?: (blob1: Blob, blob2: Blob) => Promise<any>;
 }
 
 export function PsychTestPopup({
@@ -23,16 +26,51 @@ export function PsychTestPopup({
     participants,
     voiceStatus,
     onClose,
+    registerSpeechHandler,
+    unregisterSpeechHandler,
+    submitPsychTestResult,
 }: PsychTestPopupProps) {
-    const [currentIdx, setCurrentIdx] = useState(0);
-    const total = participantCount;
-    const names = participants ?? Array.from({ length: total }, (_, i) => `참가자 ${i + 1}`);
-    const isLast = currentIdx === total - 1;
+    const [currentIdx, setCurrentIdx] = useState(0); // 0=P1, 1=P2, 2=loading, 3=result
+    const [finalResult, setFinalResult] = useState<string | null>(null);
+    const audioBlobsRef = useRef<Blob[]>([]);
+
+    // 2명의 턴이 모두 끝났는지 여부
+    const isDone = currentIdx >= 2;
+
+    useEffect(() => {
+        if (!registerSpeechHandler || !unregisterSpeechHandler) return;
+
+        registerSpeechHandler(async (blob: Blob) => {
+            const currentCount = audioBlobsRef.current.length;
+            if (currentCount === 0) {
+                audioBlobsRef.current.push(blob);
+                setCurrentIdx(1); // Move to P2
+            } else if (currentCount === 1) {
+                audioBlobsRef.current.push(blob);
+                setCurrentIdx(2); // Move to Processing
+
+                try {
+                    unregisterSpeechHandler();
+                    if (submitPsychTestResult) {
+                        const result = await submitPsychTestResult(audioBlobsRef.current[0], audioBlobsRef.current[1]);
+                        setFinalResult(result.reply || result.response || "결과 분석이 완료되었습니다.");
+                    }
+                } catch (err) {
+                    setFinalResult("오류가 발생했습니다.");
+                } finally {
+                    setCurrentIdx(3); // Show Result
+                }
+            }
+        });
+
+        return () => unregisterSpeechHandler();
+    }, [registerSpeechHandler, unregisterSpeechHandler, submitPsychTestResult]);
 
     const handleNext = () => {
-        if (isLast) {
+        if (currentIdx === 3) {
             onClose();
         } else {
+            // 버튼 클릭으로 임의 진행 (디버깅/폴백 용)
             setCurrentIdx((p) => p + 1);
         }
     };
@@ -64,42 +102,64 @@ export function PsychTestPopup({
                 {question}
             </p>
 
-            {/* Person indicator */}
+            {/* Person indicator & instructions */}
             <div className="px-6 pt-4 pb-2">
-                {/* Progress dots */}
-                <div className="flex gap-2 mb-3">
-                    {names.map((_, i) => (
-                        <div
-                            key={i}
-                            className="h-1.5 rounded-full transition-all duration-300"
-                            style={{
-                                flex: i === currentIdx ? 2 : 1,
-                                backgroundColor: i <= currentIdx ? "#86E3E3" : "#E5E7EB",
-                            }}
-                        />
-                    ))}
-                </div>
-
-                <AnimatePresence mode="wait">
-                    <motion.div
-                        key={currentIdx}
-                        initial={{ opacity: 0, x: 16 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        exit={{ opacity: 0, x: -16 }}
-                        transition={{ duration: 0.2 }}
-                        className="flex items-center gap-2"
-                    >
-                        <div
-                            className="w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold text-white"
-                            style={{ backgroundColor: "#86E3E3" }}
-                        >
-                            {currentIdx + 1}
+                {currentIdx < 2 && (
+                    <>
+                        <div className="flex gap-2 mb-3">
+                            {[0, 1].map((i) => (
+                                <div
+                                    key={i}
+                                    className="h-1.5 rounded-full transition-all duration-300"
+                                    style={{
+                                        flex: i === currentIdx ? 2 : 1,
+                                        backgroundColor: i <= currentIdx ? "#86E3E3" : "#E5E7EB",
+                                    }}
+                                />
+                            ))}
                         </div>
-                        <span className="font-semibold text-[#1A1A1A] dark:text-[#F0F0F0]">
-                            {names[currentIdx]} 답변 중
-                        </span>
+
+                        <AnimatePresence mode="wait">
+                            <motion.div
+                                key={currentIdx}
+                                initial={{ opacity: 0, x: 16 }}
+                                animate={{ opacity: 1, x: 0 }}
+                                exit={{ opacity: 0, x: -16 }}
+                                transition={{ duration: 0.2 }}
+                                className="flex items-center gap-2 mb-2"
+                            >
+                                <div
+                                    className="w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold text-white shrink-0"
+                                    style={{ backgroundColor: "#86E3E3" }}
+                                >
+                                    {currentIdx + 1}
+                                </div>
+                                <span className="font-bold text-[#1A1A1A] dark:text-[#F0F0F0] text-lg">
+                                    {currentIdx === 0 ? "첫 번째 사람이 말하세요 🗣️" : "이제 두 번째 사람이 말하세요 🗣️"}
+                                </span>
+                            </motion.div>
+                        </AnimatePresence>
+                    </>
+                )}
+
+                {currentIdx === 2 && (
+                    <motion.div
+                        initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
+                        className="text-center py-6 font-bold text-[#1A1A1A] dark:text-[#F0F0F0] text-lg"
+                    >
+                        궁합 분석 중입니다... ⏳
                     </motion.div>
-                </AnimatePresence>
+                )}
+
+                {currentIdx === 3 && finalResult && (
+                    <motion.div
+                        initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
+                        className="mt-4 p-4 rounded-xl text-sm leading-relaxed whitespace-pre-wrap font-medium"
+                        style={{ backgroundColor: "#F5E9BB", color: "#4A3800" }}
+                    >
+                        {finalResult}
+                    </motion.div>
+                )}
             </div>
 
             {/* Voice indicator */}
@@ -108,15 +168,17 @@ export function PsychTestPopup({
             </div>
 
             {/* Next / Done button */}
-            <div className="px-6 pb-6 pt-1">
-                <button
-                    onClick={handleNext}
-                    className="w-full py-3.5 rounded-2xl font-bold text-base text-white transition-transform active:scale-[0.97]"
-                    style={{ backgroundColor: "#86E3E3", color: "#0A4040" }}
-                >
-                    {isLast ? "완료" : "다음 →"}
-                </button>
-            </div>
+            {currentIdx === 3 && (
+                <div className="px-6 pb-6 pt-1">
+                    <button
+                        onClick={handleNext}
+                        className="w-full py-3.5 rounded-2xl font-bold text-base text-white transition-transform active:scale-[0.97]"
+                        style={{ backgroundColor: "#86E3E3", color: "#0A4040" }}
+                    >
+                        닫기
+                    </button>
+                </div>
+            )}
         </motion.div>
     );
 }

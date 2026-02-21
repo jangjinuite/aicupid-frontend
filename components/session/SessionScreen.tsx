@@ -50,6 +50,8 @@ export function SessionScreen() {
         status, isWaiting, avatarState,
         loading, error, gameEvent,
         start, stop, forceCommit, dismissEvent,
+        registerSpeechHandler, unregisterSpeechHandler,
+        triggerPsychTest, submitPsychTestResult
     } = useVoiceCapture();
 
     const [devEvent, setDevEvent] = useState<GameEvent | null>(null);
@@ -65,12 +67,16 @@ export function SessionScreen() {
 
     useEffect(() => {
         const handler = (e: KeyboardEvent) => {
-            const ev = DEV_EVENTS[e.key];
-            if (ev) setDevEvent(ev);
+            if (e.key === "1") {
+                if (status !== "idle" && status !== "waiting") void triggerPsychTest();
+            } else {
+                const ev = DEV_EVENTS[e.key];
+                if (ev) setDevEvent(ev);
+            }
         };
         window.addEventListener("keydown", handler);
         return () => window.removeEventListener("keydown", handler);
-    }, []);
+    }, [triggerPsychTest, status]);
 
     const activeEvent = gameEvent ?? devEvent;
     const dismissActive = gameEvent ? dismissEvent : () => setDevEvent(null);
@@ -213,6 +219,9 @@ export function SessionScreen() {
                                 question={activeEvent.question}
                                 voiceStatus={status}
                                 onClose={dismissActive}
+                                registerSpeechHandler={registerSpeechHandler}
+                                unregisterSpeechHandler={unregisterSpeechHandler}
+                                submitPsychTestResult={submitPsychTestResult}
                             />
                         )}
 
