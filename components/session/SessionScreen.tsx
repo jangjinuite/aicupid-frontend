@@ -13,7 +13,7 @@ import { BalanceGamePopup } from "./popups/BalanceGamePopup";
 import { QuizPopup } from "./popups/QuizPopup";
 import { ActionModal } from "@/components/shared/ActionModal";
 import { PERSONAS } from "@/lib/mockData";
-import { popupVariants } from "@/lib/animations";
+import { popupVariants, modalCardVariants } from "@/lib/animations";
 import type { GameEvent } from "@/types";
 
 const STATUS_PILL: Record<string, { label: string; bg: string; text: string }> = {
@@ -22,6 +22,12 @@ const STATUS_PILL: Record<string, { label: string; bg: string; text: string }> =
     speaking: { label: "🎙 녹음 중", bg: "#FDCFF7", text: "#4A0A40" },
     ai_speaking: { label: "🔊 AI 응답", bg: "#F5E9BB", text: "#4A3800" },
     waiting: { label: "⏳ 처리 중", bg: "#F5E9BB", text: "#4A3800" },
+};
+
+const GAME_LABELS: Record<string, string> = {
+    psych: "심리 테스트",
+    balance: "밸런스 게임",
+    quiz: "퀴즈",
 };
 
 // ── Dev test fixtures (keyboard 1/2/3) ───────────────────────
@@ -48,12 +54,37 @@ const DEV_EVENTS: Record<string, GameEvent> = {
     },
 };
 
+// ── Loading card shown while API is pending ───────────────────
+function GameLoadingCard({ type }: { type: "quiz" | "psych" | "balance" }) {
+    return (
+        <motion.div
+            className="relative w-full popup-sheet rounded-[2rem] z-30 px-6 py-10 flex flex-col items-center gap-5"
+            variants={modalCardVariants}
+            initial="hidden"
+            animate="visible"
+            exit="exit"
+        >
+            <span className="text-xs font-bold tracking-widest uppercase text-gold">
+                {GAME_LABELS[type]}
+            </span>
+            <motion.div
+                animate={{ rotate: 360 }}
+                transition={{ repeat: Infinity, duration: 1, ease: "linear" }}
+                className="w-9 h-9 border-4 border-[#1A1A1A]/10 border-t-[#86E3E3] rounded-full"
+            />
+            <p className="text-sm font-bold text-[#1A1A1A]/50 dark:text-white/40 animate-pulse">
+                로딩 중...
+            </p>
+        </motion.div>
+    );
+}
+
 export function SessionScreen() {
     const router = useRouter();
     const { state, dispatch } = useAppContext();
     const {
         status, isWaiting, avatarState,
-        loading, error, gameEvent,
+        loading, error, gameEvent, lastReply,
         start, stop, forceCommit, dismissEvent,
         registerSpeechHandler, unregisterSpeechHandler,
         triggerPsychTest, submitPsychTestResult,
@@ -65,8 +96,6 @@ export function SessionScreen() {
     const [showStopModal, setShowStopModal] = useState(false);
 
     useEffect(() => {
-        // Auto-start session immediately when VAD is loaded (not loading)
-        // instead of waiting for wsStatus === "connected" which only happens after start().
         if (!loading && status === "idle") {
             start();
         }
@@ -74,21 +103,23 @@ export function SessionScreen() {
 
     useEffect(() => {
         const handler = (e: KeyboardEvent) => {
+            // 팝업이 떠 있으면 다른 키 입력 무시
+            if (gameEvent || devEvent) return;
+
             if (e.key === "1") {
                 if (status !== "idle" && status !== "waiting") void triggerPsychTest();
+                else setDevEvent(DEV_EVENTS["1"]);
             } else if (e.key === "2") {
                 if (status !== "idle" && status !== "waiting") void triggerBalanceGame();
                 else setDevEvent(DEV_EVENTS["2"]);
             } else if (e.key === "3") {
                 if (status !== "idle" && status !== "waiting") void triggerQuiz();
-            } else {
-                const ev = DEV_EVENTS[e.key];
-                if (ev) setDevEvent(ev);
+                else setDevEvent(DEV_EVENTS["3"]);
             }
         };
         window.addEventListener("keydown", handler);
         return () => window.removeEventListener("keydown", handler);
-    }, [triggerPsychTest, triggerBalanceGame, triggerQuiz, status]);
+    }, [triggerPsychTest, triggerBalanceGame, triggerQuiz, status, gameEvent, devEvent]);
 
     const activeEvent = gameEvent ?? devEvent;
     const dismissActive = gameEvent ? dismissEvent : () => setDevEvent(null);
@@ -109,7 +140,6 @@ export function SessionScreen() {
     const confirmStop = () => {
         setShowStopModal(false);
         stop();
-        // 실제 AI 요약 구현이 필요
         dispatch({ type: "SET_SESSION_SUMMARY", payload: "" });
         router.push("/summary");
     };
@@ -145,17 +175,45 @@ export function SessionScreen() {
             {/* ── Avatar area ──────────────────────────────────── */}
             <div className="flex-1 flex flex-col items-center justify-center gap-4 px-4 overflow-hidden">
                 {!activeEvent && (
-                    <motion.button
-                        onClick={isActive && !isWaiting ? forceCommit : undefined}
-                        className={isActive && !isWaiting ? "cursor-pointer" : "cursor-default"}
-                        whileTap={isActive && !isWaiting ? { scale: 0.97 } : {}}
-                    >
-                        <AvatarCore
-                            avatarState={avatarState}
-                            voiceStatus={status}
-                            persona={persona}
-                        />
-                    </motion.button>
+                    <>
+                        <motion.button
+                            onClick={isActive && !isWaiting ? forceCommit : undefined}
+                            className={isActive && !isWaiting ? "cursor-pointer" : "cursor-default"}
+                            whileTap={isActive && !isWaiting ? { scale: 0.97 } : {}}
+                        >
+                            <AvatarCore
+                                avatarState={avatarState}
+                                voiceStatus={status}
+                                persona={persona}
+                            />
+                        </motion.button>
+
+                        {/* 말풍선 */}
+                        <AnimatePresence>
+                            {lastReply && (
+                                <motion.div
+                                    key={lastReply}
+                                    initial={{ opacity: 0, y: -6, scale: 0.96 }}
+                                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                                    exit={{ opacity: 0, y: 4, scale: 0.96 }}
+                                    transition={{ duration: 0.2 }}
+                                    className="relative max-w-[280px] px-4 py-3 rounded-2xl text-sm font-medium leading-relaxed text-center break-keep"
+                                    style={{ backgroundColor: "#F5E9BB", color: "#4A3800" }}
+                                >
+                                    {/* 말풍선 꼭짓점 (위쪽 화살표) */}
+                                    <span
+                                        className="absolute -top-2 left-1/2 -translate-x-1/2 w-0 h-0"
+                                        style={{
+                                            borderLeft: "8px solid transparent",
+                                            borderRight: "8px solid transparent",
+                                            borderBottom: "8px solid #F5E9BB",
+                                        }}
+                                    />
+                                    {lastReply}
+                                </motion.div>
+                            )}
+                        </AnimatePresence>
+                    </>
                 )}
 
                 {/* Status pill */}
@@ -223,11 +281,14 @@ export function SessionScreen() {
                         variants={popupVariants}
                     >
                         {/* Dim backdrop */}
-                        <div
-                            className="absolute inset-0 bg-black/40"
-                        />
+                        <div className="absolute inset-0 bg-black/40" />
 
-                        {activeEvent.type === "psych" && (
+                        {/* 로딩 중 */}
+                        {activeEvent.loading && (
+                            <GameLoadingCard type={activeEvent.type} />
+                        )}
+
+                        {!activeEvent.loading && activeEvent.type === "psych" && (
                             <PsychTestPopup
                                 question={activeEvent.question}
                                 voiceStatus={status}
@@ -242,7 +303,7 @@ export function SessionScreen() {
                             />
                         )}
 
-                        {activeEvent.type === "balance" && activeEvent.questions && (
+                        {!activeEvent.loading && activeEvent.type === "balance" && activeEvent.questions && (
                             <BalanceGamePopup
                                 questions={activeEvent.questions}
                                 voiceStatus={status}
@@ -257,7 +318,7 @@ export function SessionScreen() {
                             />
                         )}
 
-                        {activeEvent.type === "quiz" && (
+                        {!activeEvent.loading && activeEvent.type === "quiz" && (
                             <QuizPopup
                                 questionId={activeEvent.questionId}
                                 question={activeEvent.question}

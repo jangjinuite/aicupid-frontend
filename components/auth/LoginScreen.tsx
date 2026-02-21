@@ -33,6 +33,11 @@ export function LoginScreen() {
 
             const data = await response.json();
 
+            // access_token 저장
+            if (data.access_token) {
+                localStorage.setItem("access_token", data.access_token);
+            }
+
             // 백엔드가 상세 프로필을 반환하면 사용하고, 없다면 임시로 아이디를 이름으로 사용
             const userProfile = data.userProfile || {
                 userId: userId.trim(),

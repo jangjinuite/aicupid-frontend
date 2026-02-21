@@ -1,12 +1,11 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useRouter } from "next/navigation";
-import { Search, X, ChevronLeft, User } from "lucide-react";
+import { Search, X, ChevronLeft } from "lucide-react";
 import { useAppContext } from "@/context/AppContext";
 import { ProfileEditModal } from "@/components/profile/ProfileEditModal";
-import { MOCK_USERS } from "@/lib/mockData";
 import type { MatchedUser } from "@/types";
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL ?? "http://localhost:8000";
@@ -73,11 +72,42 @@ export function MatchScreen() {
     const [selected, setSelected] = useState<MatchedUser | null>(null);
     const [confirming, setConfirming] = useState(false);
     const [showEditModal, setShowEditModal] = useState(false);
+    const [results, setResults] = useState<MatchedUser[]>([]);
+    const [searching, setSearching] = useState(false);
+    const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-    const filtered = useMemo(() => {
-        if (!query.trim()) return MOCK_USERS;
-        const q = query.toLowerCase();
-        return MOCK_USERS.filter(u => u.userId.toLowerCase().includes(q));
+    useEffect(() => {
+        if (debounceRef.current) clearTimeout(debounceRef.current);
+        debounceRef.current = setTimeout(async () => {
+            setSearching(true);
+            try {
+                const token = localStorage.getItem("access_token");
+                const params = new URLSearchParams({ skip: "0", limit: "15" });
+                if (query.trim()) params.set("userId", query.trim());
+                const res = await fetch(`${BACKEND_URL}/api/users/search?${params}`, {
+                    headers: token ? { Authorization: `Bearer ${token}` } : {},
+                });
+                if (!res.ok) throw new Error();
+                const data = await res.json();
+                setResults(
+                    (data.users ?? []).map((u: any) => ({
+                        userId: u.userId,
+                        name: u.name ?? u.userId,
+                        age: u.age ?? 0,
+                        gender: u.gender ?? "male",
+                        mbti: u.mbti ?? "",
+                        interests: u.interests ?? [],
+                        bio: "",
+                        profileImage: u.profileImage,
+                    }))
+                );
+            } catch {
+                setResults([]);
+            } finally {
+                setSearching(false);
+            }
+        }, 300);
+        return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
     }, [query]);
 
     const handleSelect = (user: MatchedUser) => {
@@ -187,12 +217,16 @@ export function MatchScreen() {
             {/* User list */}
             {!confirming && (
                 <div className="flex-1 overflow-y-auto px-5 flex flex-col gap-2 pb-4">
-                    {filtered.length === 0 ? (
+                    {searching ? (
+                        <p className="text-center text-sm text-[#1A1A1A]/40 dark:text-white/30 py-10">
+                            검색 중...
+                        </p>
+                    ) : results.length === 0 ? (
                         <p className="text-center text-sm text-[#1A1A1A]/40 dark:text-white/30 py-10">
                             검색 결과가 없습니다
                         </p>
                     ) : (
-                        filtered.map(user => (
+                        results.map(user => (
                             <UserRow
                                 key={user.userId}
                                 user={user}

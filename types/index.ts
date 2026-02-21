@@ -40,6 +40,7 @@ export interface GameEvent {
     questionId?: string; // for quiz
     question: string;
     choices: string[];
+    loading?: boolean; // true while API response is pending
     // for balance game sequence
     questions?: {
         text: string;

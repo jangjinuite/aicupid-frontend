@@ -24,6 +24,7 @@ export interface UseVoiceCaptureReturn {
   loading: boolean;
   error: string | null;
   gameEvent: GameEvent | null;
+  lastReply: string | null;
   debugLog: DebugEvent[];
   start: () => void;
   stop: () => void;
@@ -91,6 +92,7 @@ export function useVoiceCapture(): UseVoiceCaptureReturn {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [gameEvent, setGameEvent] = useState<GameEvent | null>(null);
+  const [lastReply, setLastReply] = useState<string | null>(null);
   const [debugLog, setDebugLog] = useState<DebugEvent[]>([]);
 
   // refs
@@ -172,6 +174,7 @@ export function useVoiceCapture(): UseVoiceCaptureReturn {
 
       if (reply) {
         pushLog(`◀ AI 답변: ${reply}`, "green");
+        setLastReply(reply);
       }
 
       if (audioB64) {
@@ -214,6 +217,7 @@ export function useVoiceCapture(): UseVoiceCaptureReturn {
 
     isFetchingRef.current = true;
     setStatus("waiting");
+    setGameEvent({ type: "psych", question: "", choices: [], loading: true });
     pushLog("▶ 심리테스트 문제 요청 중...", "blue");
 
     try {
@@ -311,6 +315,7 @@ export function useVoiceCapture(): UseVoiceCaptureReturn {
 
     isFetchingRef.current = true;
     setStatus("waiting");
+    setGameEvent({ type: "quiz", question: "", choices: [], loading: true });
     pushLog("▶ 퀴즈 문제 요청 중...", "blue");
 
     try {
@@ -408,6 +413,7 @@ export function useVoiceCapture(): UseVoiceCaptureReturn {
 
     isFetchingRef.current = true;
     setStatus("waiting");
+    setGameEvent({ type: "balance", question: "", choices: [], loading: true });
     pushLog("▶ 밸런스 게임 문제 요청 중...", "blue");
 
     try {
@@ -560,6 +566,7 @@ export function useVoiceCapture(): UseVoiceCaptureReturn {
       onSpeechStart() {
         if (isFetchingRef.current) return;
         pushLog("🎙 사용자가 말하기 시작함", "yellow");
+        setLastReply(null);
         setStatus((prev) => (prev === "listening" ? "speaking" : prev));
       },
 
@@ -690,7 +697,7 @@ export function useVoiceCapture(): UseVoiceCaptureReturn {
 
   return {
     status, isWaiting, avatarState,
-    loading, error, gameEvent, debugLog,
+    loading, error, gameEvent, lastReply, debugLog,
     start, stop, forceCommit, dismissEvent,
     registerSpeechHandler, unregisterSpeechHandler,
     triggerPsychTest, submitPsychTestResult,
