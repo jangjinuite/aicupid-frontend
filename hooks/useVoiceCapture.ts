@@ -7,7 +7,7 @@ import type { AvatarState, GameEvent } from "@/types";
 
 const BACKEND_URL =
   process.env.NEXT_PUBLIC_BACKEND_URL ?? "http://localhost:8000";
-const WS_URL = BACKEND_URL.replace(/^http/, "ws") + "/ws";
+const WS_URL = BACKEND_URL.replace(/^http/, "ws") + "/ws/audio";
 
 /** ScriptProcessorNode 버퍼 크기 (samples). 4096 ≈ 85–256 ms */
 const CHUNK_SIZE = 4096;
