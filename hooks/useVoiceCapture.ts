@@ -231,9 +231,15 @@ export function useVoiceCapture(): UseVoiceCaptureReturn {
       // triggered_game 있으면 reply 오디오 없이 바로 게임 팝업 실행
       if (pendingGameEvent) {
         pushLog(`◀ 게임 트리거됨: ${pendingGameEvent.type}`, "purple");
-        setGameEvent(pendingGameEvent);
         isFetchingRef.current = false;
-        setStatus((prev) => (prev === "ai_speaking" || prev === "waiting") ? "listening" : prev);
+        if (pendingGameEvent.type === "psych") {
+          void triggerPsychTest();
+        } else if (pendingGameEvent.type === "quiz") {
+          void triggerQuiz();
+        } else {
+          setGameEvent(pendingGameEvent);
+          setStatus((prev) => (prev === "ai_speaking" || prev === "waiting") ? "listening" : prev);
+        }
         return;
       }
 
