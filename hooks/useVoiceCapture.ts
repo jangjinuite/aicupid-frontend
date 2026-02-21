@@ -222,29 +222,31 @@ export function useVoiceCapture(): UseVoiceCaptureReturn {
 
       if (reply) {
         pushLog(`◀ AI 답변: ${reply}`, "green");
-        setLastReply(reply);
+        if (!pendingGameEvent) setLastReply(reply);
       }
 
+      // triggered_game 있으면 reply 오디오 없이 바로 게임 팝업 실행
       if (pendingGameEvent) {
         pushLog(`◀ 게임 트리거됨: ${pendingGameEvent.type}`, "purple");
+        setGameEvent(pendingGameEvent);
+        isFetchingRef.current = false;
+        setStatus((prev) => (prev === "ai_speaking" || prev === "waiting") ? "listening" : prev);
+        return;
       }
 
       if (audioB64) {
         pushLog(`◀ 오디오 수신 (${Math.round((audioB64.length * 3) / 4 / 1024)}KB)`, "blue");
         setStatus("ai_speaking");
+        if (vadRef.current) void vadRef.current.pause();
 
         await playResponse(audioB64, mimeType, () => {
           pushLog("✓ 오디오 재생 완료", "green");
-          if (pendingGameEvent) {
-            setGameEvent(pendingGameEvent);
-          }
+          void startMediaRecorder();
+          if (vadRef.current && !destroyedRef.current) void vadRef.current.start();
           isFetchingRef.current = false;
           setStatus((prev) => (prev === "ai_speaking" || prev === "waiting") ? "listening" : prev);
         });
       } else {
-        if (pendingGameEvent) {
-          setGameEvent(pendingGameEvent);
-        }
         isFetchingRef.current = false;
         setStatus((prev) => (prev === "ai_speaking" || prev === "waiting") ? "listening" : prev);
       }
@@ -303,8 +305,11 @@ export function useVoiceCapture(): UseVoiceCaptureReturn {
       if (audioB64) {
         pushLog(`◀ 오디오 수신 (${Math.round((audioB64.length * 3) / 4 / 1024)}KB)`, "blue");
         setStatus("ai_speaking");
+        if (vadRef.current) void vadRef.current.pause();
 
         await playResponse(audioB64, mimeType, () => {
+          void startMediaRecorder();
+          if (vadRef.current && !destroyedRef.current) void vadRef.current.start();
           isFetchingRef.current = false;
           setStatus((prev) => (prev === "ai_speaking" || prev === "waiting") ? "listening" : prev);
         });
@@ -344,8 +349,11 @@ export function useVoiceCapture(): UseVoiceCaptureReturn {
 
       if (data.audio) {
         setStatus("ai_speaking");
+        if (vadRef.current) void vadRef.current.pause();
 
         await playResponse(data.audio, data.mime_type || "audio/wav", () => {
+          void startMediaRecorder();
+          if (vadRef.current && !destroyedRef.current) void vadRef.current.start();
           isFetchingRef.current = false;
           setStatus((prev) => (prev === "ai_speaking" || prev === "waiting") ? "listening" : prev);
         });
@@ -402,8 +410,11 @@ export function useVoiceCapture(): UseVoiceCaptureReturn {
       if (data.audio) {
         pushLog(`◀ 퀴즈 문제 오디오 수신`, "blue");
         setStatus("ai_speaking");
+        if (vadRef.current) void vadRef.current.pause();
 
         await playResponse(data.audio, data.mime_type || "audio/wav", () => {
+          void startMediaRecorder();
+          if (vadRef.current && !destroyedRef.current) void vadRef.current.start();
           isFetchingRef.current = false;
           setStatus((prev) => (prev === "ai_speaking" || prev === "waiting") ? "listening" : prev);
         });
@@ -443,7 +454,11 @@ export function useVoiceCapture(): UseVoiceCaptureReturn {
 
       if (data.audio) {
         setStatus("ai_speaking");
+        if (vadRef.current) void vadRef.current.pause();
+
         await playResponse(data.audio, data.mime_type || "audio/wav", () => {
+          void startMediaRecorder();
+          if (vadRef.current && !destroyedRef.current) void vadRef.current.start();
           isFetchingRef.current = false;
           setStatus((prev) => (prev === "ai_speaking" || prev === "waiting") ? "listening" : prev);
         });
@@ -534,7 +549,11 @@ export function useVoiceCapture(): UseVoiceCaptureReturn {
 
       if (data.audio) {
         setStatus("ai_speaking");
+        if (vadRef.current) void vadRef.current.pause();
+
         await playResponse(data.audio, data.mime_type || "audio/wav", () => {
+          void startMediaRecorder();
+          if (vadRef.current && !destroyedRef.current) void vadRef.current.start();
           isFetchingRef.current = false;
           setStatus((prev) => (prev === "ai_speaking" || prev === "waiting") ? "listening" : prev);
         });
@@ -639,6 +658,7 @@ export function useVoiceCapture(): UseVoiceCaptureReturn {
           // 핸들러가 서버 요청을 시작하지 않았으면(isFetchingRef 여전히 false) 바로 listening 복귀
           if (!isFetchingRef.current) {
             setStatus("listening");
+            void startMediaRecorder(); // P1 경로: fetch 없으므로 레코더 즉시 재시작
           }
         } else {
           void sendAudioData(finalBlob);
@@ -706,15 +726,12 @@ export function useVoiceCapture(): UseVoiceCaptureReturn {
       // 핸들러가 서버 요청을 시작하지 않았으면(isFetchingRef 여전히 false) 바로 listening 복귀
       if (!isFetchingRef.current) {
         setStatus("listening");
+        void startMediaRecorder(); // P1 경로: fetch 없으므로 레코더 즉시 재시작
       }
+      // fetch가 시작됐으면 onPlayEnded에서 VAD·레코더 재시작
     } else {
       await sendAudioData(recordedBlob);
-    }
-
-    // 처리가 끝나고 idle/listening 상태로 돌아갈때 VAD 재기동
-    if (vadRef.current && !destroyedRef.current) {
-      void vadRef.current.start();
-      void startMediaRecorder(); // 다음 음성 캡처용으로 레코더 재시작
+      // sendAudioData의 onPlayEnded가 VAD·레코더 재시작 담당
     }
 
   }, [sendAudioData, pushLog]);

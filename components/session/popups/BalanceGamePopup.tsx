@@ -194,7 +194,7 @@ export function BalanceGamePopup({
                         className="px-6 pb-4"
                     >
                         <div
-                            className="p-4 rounded-xl text-sm leading-relaxed whitespace-pre-wrap font-medium"
+                            className="p-4 rounded-xl text-sm leading-relaxed whitespace-pre-wrap font-medium break-words overflow-hidden"
                             style={{ backgroundColor: "#F5E9BB", color: "#4A3800" }}
                         >
                             {finalResult}

@@ -120,14 +120,14 @@ export function SummaryScreen() {
                     initial={{ opacity: 0, y: 12 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: 0.15 }}
-                    className="w-full rounded-3xl p-5"
+                    className="w-full rounded-3xl p-5 overflow-hidden"
                     style={{
                         backgroundColor: "#F6FAFA",
                         border: "1.5px solid #B8F0F0",
                         minHeight: 200,
                     }}
                 >
-                    <p className="text-sm font-medium text-[#1A1A1A] dark:text-[#F0F0F0] leading-relaxed whitespace-pre-line">
+                    <p className="text-sm font-medium text-[#1A1A1A] dark:text-[#F0F0F0] leading-relaxed whitespace-pre-line break-words">
                         {summaryText}
                     </p>
                 </motion.div>
